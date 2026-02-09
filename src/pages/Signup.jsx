@@ -4,6 +4,7 @@ import { Wallet, TrendingUp, Award, MoreVertical, Shield, Instagram,
   MessageSquare, Search, User, ChevronDown, ChevronUp, ChevronRight, Check,
   LogOut, Copy, X, Menu, Plus, Edit, Trash2, Upload, XCircle,
   Star} from 'lucide-react';
+  
 // Mock Firebase auth functions
 const mockAuth = {
   createUserWithEmailAndPassword: async (auth, email, password) => {
@@ -9887,137 +9888,204 @@ function BrandOwnerDashboard({ user, onLogout }) {
         );
         
       case 'bank':
-        return (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-bold mb-6">Bank Account</h2>
-            {userData?.bankAccount ? (
-              <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                <div className="flex items-center">
-                  <Check className="text-green-600 mr-2" size={24} />
-                  <div>
-                    <h3 className="text-lg font-semibold text-green-800">Bank Account Added</h3>
-                    <p className="text-green-700">Your bank account has been successfully added.</p>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-sm text-gray-500">Account Number:</span>
-                    <p className="font-medium">XXXXXX{userData.bankAccount.accountNumber.slice(-4)}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500">IFSC Code:</span>
-                    <p className="font-medium">{userData.bankAccount.ifsc}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500">Bank Name:</span>
-                    <p className="font-medium">{userData.bankAccount.bankName}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500">Account Holder:</span>
-                    <p className="font-medium">{userData.bankAccount.accountHolder}</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleBankSubmit}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                    <input 
-                      type="text" 
-                      value={bankData.accountNumber}
-                      onChange={(e) => setBankData({...bankData, accountNumber: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter your account number"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">IFSC Code</label>
-                    <input 
-                      type="text" 
-                      value={bankData.ifsc}
-                      onChange={(e) => setBankData({...bankData, ifsc: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter your IFSC code"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
-                    <input 
-                      type="text" 
-                      value={bankData.bankName}
-                      onChange={(e) => setBankData({...bankData, bankName: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter your bank name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Holder Name</label>
-                    <input 
-                      type="text" 
-                      value={bankData.accountHolder}
-                      onChange={(e) => setBankData({...bankData, accountHolder: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter account holder name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Bank Passbook Photo</label>
-                    <div className="flex items-center space-x-4">
-                      <input 
-                        type="file" 
-                        id="passbook-photo"
-                        accept="image/*"
-                        onChange={(e) => handleFileUpload(e, 'passbookPhoto')}
-                        className="hidden"
-                      />
-                      <label 
-                        htmlFor="passbook-photo"
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 cursor-pointer flex items-center"
-                      >
-                        <Upload size={16} className="mr-2" />
-                        Choose File
-                      </label>
-                      {bankData.passbookPhoto && (
-                        <div className="flex items-center">
-                          <span className="text-sm text-green-600">Photo uploaded</span>
-                          <button 
-                            type="button"
-                            onClick={() => setBankData({...bankData, passbookPhoto: null})}
-                            className="ml-2 text-red-500 hover:text-red-700"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      id="bank-terms"
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      required
-                    />
-                    <label htmlFor="bank-terms" className="ml-2 text-sm text-gray-700">
-                      I agree to terms and conditions for adding bank account
-                    </label>
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    Add Bank Account
-                  </button>
-                </div>
-              </form>
-            )}
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <h2 className="text-2xl font-bold mb-6">Bank Account</h2>
+      {userData?.bankAccount ? (
+        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
+          <div className="flex items-center">
+            <Check className="text-green-600 mr-2" size={24} />
+            <div>
+              <h3 className="text-lg font-semibold text-green-800">Bank Account Added</h3>
+              <p className="text-green-700">Your bank account has been successfully added.</p>
+            </div>
           </div>
-        );
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span className="text-sm text-gray-500">Account Number:</span>
+              <p className="font-medium">XXXXXX{userData.bankAccount.accountNumber.slice(-4)}</p>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500">IFSC Code:</span>
+              <p className="font-medium">{userData.bankAccount.ifsc}</p>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500">Bank Name:</span>
+              <p className="font-medium">{userData.bankAccount.bankName}</p>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500">Account Holder:</span>
+              <p className="font-medium">{userData.bankAccount.accountHolder}</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleBankSubmit}>
+          <div className="space-y-4">
+            {/* Account Number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+              <input 
+                type="text" 
+                value={bankData.accountNumber}
+                onChange={(e) => setBankData({...bankData, accountNumber: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your account number"
+                required
+              />
+            </div>
+
+            {/* Bank Account Type - Radio Buttons */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Bank Account Type</label>
+              <div className="flex space-x-6">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="accountType"
+                    value="Checking"
+                    checked={bankData.accountType === 'Checking'}
+                    onChange={(e) => setBankData({...bankData, accountType: e.target.value})}
+                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Checking</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="accountType"
+                    value="Savings"
+                    checked={bankData.accountType === 'Savings'}
+                    onChange={(e) => setBankData({...bankData, accountType: e.target.value})}
+                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Savings</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Bank Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
+              <input 
+                type="text" 
+                value={bankData.bankName}
+                onChange={(e) => setBankData({...bankData, bankName: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your bank name"
+                required
+              />
+            </div>
+
+            {/* Bank Address - Text Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Bank Address</label>
+              <input 
+                type="text" 
+                value={bankData.bankAddress}
+                onChange={(e) => setBankData({...bankData, bankAddress: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter bank address"
+                required
+              />
+            </div>
+
+            {/* IFSC Code (Existing) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">IFSC Code</label>
+              <input 
+                type="text" 
+                value={bankData.ifsc}
+                onChange={(e) => setBankData({...bankData, ifsc: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your IFSC code"
+                required
+              />
+            </div>
+
+            {/* Account Holder Name (Existing) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Account Holder Name</label>
+              <input 
+                type="text" 
+                value={bankData.accountHolder}
+                onChange={(e) => setBankData({...bankData, accountHolder: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter account holder name"
+                required
+              />
+            </div>
+
+            {/* Bank Country - Dropdown (India Default) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Bank Country</label>
+              <select
+                value={bankData.bankCountry || 'India'}
+                onChange={(e) => setBankData({...bankData, bankCountry: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="India">India</option>
+                <option value="USA">USA</option>
+                <option value="UK">United Kingdom</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            {/* Bank Passbook Photo (Existing) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Bank Passbook Photo</label>
+              <div className="flex items-center space-x-4">
+                <input 
+                  type="file" 
+                  id="passbook-photo"
+                  accept="image/*"
+                  onChange={(e) => handleFileUpload(e, 'passbookPhoto')}
+                  className="hidden"
+                />
+                <label 
+                  htmlFor="passbook-photo"
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 cursor-pointer"
+                >
+                  Choose File
+                </label>
+                {bankData.passbookPhoto && (
+                  <div className="flex items-center">
+                    <span className="text-sm text-green-600">Photo uploaded</span>
+                    <button 
+                      type="button"
+                      onClick={() => setBankData({...bankData, passbookPhoto: null})}
+                      className="ml-2 text-red-500 hover:text-red-700"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <input 
+                type="checkbox" 
+                id="bank-terms"
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                required
+              />
+              <label htmlFor="bank-terms" className="ml-2 text-sm text-gray-700">
+                I agree to the terms and conditions for adding bank account
+              </label>
+            </div>
+            <button 
+              type="submit"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Add Bank Account
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
 
       case 'addaccessory':
         return (
@@ -11770,7 +11838,7 @@ function CustomerRegistration({ onSwitchView, onTreeUpdate }) {
       <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">ENGINEERS</h1>
-          <p className="text-gray-600 text-sm">Customer Registration</p>
+          <p className="text-gray-600 text-medium">Customer Registration</p>
         </div>
 
         {error && (
@@ -11920,10 +11988,15 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
     email: "",
     password: "",
     contact: "",
+    legalBusinessName: "",
     brandName: "",
     businessRegNo: "",
     gstNo: "",
-    businessAddress: "",
+    streetAddress: "",
+    city: "",
+    state: "",
+    postalCode: "",
+    country: "India",
     gstCertificate: null,
     registrationCertificate: null
   });
@@ -11971,10 +12044,15 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
       return;
     }
 
+    // FIX 1: Validate individual address fields instead of the non-existent 'businessAddress'
+    // Also added validation for 'legalBusinessName' which was previously missing
     if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim() || 
-        !formData.contact.trim() || !formData.brandName.trim() || 
+        !formData.contact.trim() || !formData.legalBusinessName.trim() || 
+        !formData.brandName.trim() || 
         !formData.businessRegNo.trim() || !formData.gstNo.trim() || 
-        !formData.businessAddress.trim() || !formData.gstCertificate || !formData.registrationCertificate) {
+        !formData.streetAddress.trim() || !formData.city.trim() || 
+        !formData.state.trim() || !formData.postalCode.trim() || 
+        !formData.gstCertificate || !formData.registrationCertificate) {
       setError("All fields are mandatory including Business Address and Business Proof Documents");
       setLoading(false);
       return;
@@ -11983,15 +12061,19 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
     try {
       await mockAuth.createUserWithEmailAndPassword(mockFirebaseAuth, formData.email, formData.password);
       
+      // FIX 2: Construct the full address string from the individual fields
+      const fullBusinessAddress = `${formData.streetAddress}, ${formData.city}, ${formData.state} - ${formData.postalCode}, ${formData.country}`;
+      
       const result = treeManager.registerBrandOwner(
         formData.name,
         formData.email,
         formData.password,
         formData.contact,
+        formData.legalBusinessName, // Added missing argument
         formData.brandName,
         formData.businessRegNo,
         formData.gstNo,
-        formData.businessAddress,
+        fullBusinessAddress, // Use the constructed address
         formData.gstCertificate,
         formData.registrationCertificate
       );
@@ -12014,10 +12096,15 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
           email: "",
           password: "",
           contact: "",
+          legalBusinessName: "", // Resetting this too
           brandName: "",
           businessRegNo: "",
           gstNo: "",
-          businessAddress: "",
+          streetAddress: "",
+          city: "",
+          state: "",
+          postalCode: "",
+          country: "India",
           gstCertificate: null,
           registrationCertificate: null
         });
@@ -12039,7 +12126,7 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
       <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">ENGINEERS</h1>
-          <p className="text-gray-600 text-sm">Brand Owner Registration</p>
+          <p className="text-gray-600 text-medium">Brand Owner Registration</p>
         </div>
 
         {error && (
@@ -12088,7 +12175,7 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition"
             type="text"
             name="name"
-            placeholder="Owner Full Name *"
+            placeholder="Full Name *"
             value={formData.name}
             onChange={handleInputChange}
             required
@@ -12127,6 +12214,16 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
           <input
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition"
             type="text"
+            name="legalBusinessName"
+            placeholder="Legal Business Name *"
+            value={formData.legalBusinessName}
+            onChange={handleInputChange}
+            required
+          />
+
+          <input
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition"
+            type="text"
             name="brandName"
             placeholder="Brand Name *"
             value={formData.brandName}
@@ -12154,15 +12251,55 @@ function BrandOwnerRegistration({ onSwitchView, onTreeUpdate }) {
             required
           />
 
-          <textarea
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition"
-            name="businessAddress"
-            placeholder="Registered Business Address *"
-            value={formData.businessAddress}
-            onChange={handleInputChange}
-            rows="2"
-            required
-          />
+          <div className="space-y-4">
+            <input
+              type="text"
+              name="streetAddress"
+              placeholder="Street Address *"
+              value={formData.streetAddress}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              required
+            />
+
+            <input
+              type="text"
+              name="city"
+              placeholder="City *"
+              value={formData.city}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              required
+            />
+
+            <input
+              type="text"
+              name="state"
+              placeholder="State / Province *"
+              value={formData.state}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              required
+            />
+
+            <input
+              type="text"
+              name="postalCode"
+              placeholder="Postal Code *"
+              value={formData.postalCode}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              required
+            />
+
+            <input
+              type="text"
+              name="country"
+              value={formData.country || "India"}
+              readOnly
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+            />
+          </div>
 
           <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
             <div className="text-sm font-medium text-gray-700 mb-3">Upload Business Proof *</div>

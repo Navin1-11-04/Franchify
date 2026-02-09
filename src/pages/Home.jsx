@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef,useContext } from 'react';
 import { 
   Menu, X, ChevronDown, ChevronUp, Search, Heart, Plus,
   Star, Share2, Play, User, Upload, CheckCircle,
-  Instagram, Youtube, Linkedin, Twitter,
+  Instagram, Youtube, Linkedin, Twitter, Trash2,
   Eye, ShoppingCart, Copy, Check, Minus, Plus as PlusIcon,
   Package, CreditCard, MapPin, Calendar, Download,
   Filter, Clock, CheckCircle2, Truck, Home,
@@ -1196,7 +1196,7 @@ const ProductFilter = ({
         <div className="flex gap-2">
           <button 
             onClick={applyFilters}
-            className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium text-sm"
+            className="w-full py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
           >
             Apply Filters
           </button>
@@ -1218,6 +1218,55 @@ const WishlistPage = ({ setCurrentPage }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const companyDropdownRef = useRef(null);
+
+  // State for "Move to Cart" Modal
+  const [selectionModalOpen, setSelectionModalOpen] = useState(false);
+  const [selectedWishlistItem, setSelectedWishlistItem] = useState(null);
+  const [tempSize, setTempSize] = useState('');
+  const [tempColor, setTempColor] = useState('');
+  
+  // Mock Delivery Info
+  const deliveryInfo = {
+    estimatedDays: '3-5',
+    deliveryCharge: 'FREE',
+    sellerName: 'Official Store'
+  };
+
+  // Helper Functions (Must match CategoryPage for consistency)
+  const calculateGSTInclusivePrice = (price, category) => {
+    let gstRate = 0.18; 
+    if (category === 'Clothing') {
+      gstRate = price <= 2500 ? 0.05 : 0.18;
+    }
+    return Math.round(price * (1 + gstRate));
+  };
+
+  const calculateCredits = (price) => {
+    return (price / 100).toFixed(2);
+  };
+
+  // Handler to open the modal for a specific item
+  const handleMoveToCartClick = (item) => {
+    setSelectedWishlistItem(item);
+    // Pre-fill with the specific size/color saved in the wishlist
+    setTempSize(item.selectedSize); 
+    setTempColor(item.selectedColor);
+    setSelectionModalOpen(true);
+  };
+
+  // Confirm move to cart from modal
+  const handleConfirmMoveToCart = () => {
+    if (!tempSize || !tempColor) {
+      alert('Please select size and color');
+      return;
+    }
+    // Move with the (potentially modified) size/color
+    moveToCart(selectedWishlistItem.id, tempSize, tempColor);
+    setSelectionModalOpen(false);
+    // Optional: You might want to remove from wishlist here automatically or leave it
+    // For this implementation, we assume moveToCart handles the logic or we leave it in wishlist until removed manually
+    alert('Moved to Cart successfully!');
+  };
   
   return (
     <div className="min-h-screen bg-white">
@@ -1226,6 +1275,15 @@ const WishlistPage = ({ setCurrentPage }) => {
         
         * {
           font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        }
+        
+        .animate-fade-in-up {
+          animation: fadeInUp 0.3s ease-out forwards;
+        }
+        
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
       
@@ -1243,70 +1301,210 @@ const WishlistPage = ({ setCurrentPage }) => {
       
       <div className="max-w-8xl mx-auto px-4 py-8">
         {wishlistItems.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 flex flex-col items-center justify-center min-h-[50vh]">
             <Heart size={64} className="mx-auto text-gray-300 mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Your wishlist is empty</h2>
             <p className="text-gray-600 mb-6">Looks like you haven't added anything to your wishlist yet.</p>
             <button 
               onClick={() => setCurrentPage('landing')}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+              className="px-6 py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
             >
               Continue Shopping
             </button>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {wishlistItems.map((item) => (
-              <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div className="relative">
-                  <img 
-                    src={item.images[0]} 
-                    alt={item.name} 
-                    className="w-full h-64 object-cover rounded-t-lg"
-                  />
-                  <button 
-                    onClick={() => removeFromWishlist(item.id, item.selectedSize, item.selectedColor)}
-                    className="absolute top-2 right-2 bg-white p-2 rounded-full shadow-md hover:bg-gray-100"
-                  >
-                    <X size={16} className="text-gray-600" />
-                  </button>
-                </div>
-                
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
-                  <p className="text-sm text-gray-500 mb-2">{item.brand}</p>
-                  
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <span className="text-sm bg-gray-100 px-2 py-1 rounded">Size: {item.selectedSize}</span>
-                    <span className="text-sm bg-gray-100 px-2 py-1 rounded">Color: {item.selectedColor}</span>
+            {wishlistItems.map((item) => {
+              // Price Calculations
+              const sellingPrice = calculateGSTInclusivePrice(item.price, item.category);
+              const mrp = item.originalPrice 
+                ? calculateGSTInclusivePrice(item.originalPrice, item.category)
+                : Math.round(sellingPrice * 1.2);
+              
+              const credits = calculateCredits(sellingPrice);
+              const discountPercent = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+
+              return (
+                <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col">
+                  <div className="relative">
+                    <img 
+                      src={item.images[0]} 
+                      alt={item.name} 
+                      className="w-full h-64 object-cover rounded-t-lg"
+                    />
+                    <button 
+                      onClick={() => removeFromWishlist(item.id, item.selectedSize, item.selectedColor)}
+                      className="absolute top-2 right-2 bg-white p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors z-10"
+                    >
+                      <X size={16} className="text-gray-600" />
+                    </button>
                   </div>
                   
-                  <div className="flex items-center mb-3">
-                    <span className="font-bold text-lg">₹{item.price}</span>
-                    {item.originalPrice > item.price && (
-                      <span className="text-sm text-gray-500 line-through ml-2">₹{item.originalPrice}</span>
-                    )}
-                    {item.originalPrice > item.price && (
-                      <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-1 rounded font-bold">
-                        {Math.round((1 - item.price / item.originalPrice) * 100)}% OFF
-                      </span>
-                    )}
+                  <div className="p-4 flex-1 flex flex-col">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg mb-1 leading-tight">{item.name}</h3>
+                      <p className="text-sm text-gray-500 mb-2 font-medium">{item.brand || item.brandName}</p>
+                      
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <span className="text-xs bg-gray-100 px-2 py-1 rounded font-semibold text-gray-700">Size: {item.selectedSize}</span>
+                        <span className="text-xs bg-gray-100 px-2 py-1 rounded font-semibold text-gray-700">Color: {item.selectedColor}</span>
+                      </div>
+                      
+                      <div className="flex items-center mb-1">
+                        <span className="font-bold text-lg text-gray-900">₹{sellingPrice}</span>
+                        <span className="text-sm text-gray-400 line-through ml-2">₹{mrp}</span>
+                        {discountPercent > 0 && (
+                          <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded font-bold">
+                            {discountPercent}% OFF
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Requirement: Swap Credits and Offer Place */}
+                      <div className="flex flex-col gap-1 mb-4">
+                         {/* Offer is now near the price (Small text) */}
+                         {item.offer && (
+                           <p className="text-xs text-gray-500 truncate italic">
+                             Offer: {item.offer}
+                           </p>
+                         )}
+                         {/* Credits are now in the prominent block area (Large Badge) */}
+                         <div className="flex items-center">
+                            <span className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded border border-green-200">
+                              {credits} Credits
+                            </span>
+                         </div>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => handleMoveToCartClick(item)}
+                      className="w-full py-2.5 bg-slate-800 text-white rounded hover:bg-slate-700 transition-colors font-semibold shadow-sm active:scale-95 transform duration-150"
+                    >
+                      MOVE TO CART
+                    </button>
                   </div>
-                  
-                  <button 
-                    onClick={() => moveToCart(item.id, item.selectedSize, item.selectedColor)}
-                    className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
-                  >
-                    Move to Cart
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
       
       <Footer />
+
+      {/* MYNTRA STYLE MOVE TO CART MODAL */}
+      {selectionModalOpen && selectedWishlistItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-lg overflow-hidden shadow-2xl animate-fade-in-up flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b flex justify-between items-center bg-gray-50">
+               <div>
+                 <h3 className="text-lg font-bold line-clamp-1">{selectedWishlistItem.name}</h3>
+                 <p className="text-xs text-gray-500 font-semibold">{selectedWishlistItem.brand || selectedWishlistItem.brandName}</p>
+               </div>
+               <button onClick={() => setSelectionModalOpen(false)} className="text-gray-500 hover:text-gray-800">
+                 <X size={20} />
+               </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto">
+              
+              <div className="flex gap-4 mb-6">
+                <img 
+                  src={selectedWishlistItem.images[0]} 
+                  alt={selectedWishlistItem.name}
+                  className="w-24 h-32 object-cover rounded border border-gray-200"
+                />
+                <div className="flex-1">
+                   {/* Price Summary inside Modal */}
+                   <div className="flex items-end gap-2 mb-1">
+                     <span className="text-2xl font-bold text-gray-900">₹{calculateGSTInclusivePrice(selectedWishlistItem.price, selectedWishlistItem.category)}</span>
+                     <span className="text-sm text-gray-400 line-through mb-1">₹{selectedWishlistItem.originalPrice || Math.round(calculateGSTInclusivePrice(selectedWishlistItem.price, selectedWishlistItem.category) * 1.2)}</span>
+                   </div>
+                   {/* Offer in Modal */}
+                   {selectedWishlistItem.offer && (
+                     <p className="text-xs text-gray-600 font-medium mb-1">{selectedWishlistItem.offer}</p>
+                   )}
+                   {/* Credits in Modal */}
+                   <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded font-bold">
+                     {calculateCredits(calculateGSTInclusivePrice(selectedWishlistItem.price, selectedWishlistItem.category))} Credit
+                   </span>
+                </div>
+              </div>
+
+              {/* Seller & Delivery Info Block */}
+              <div className="bg-gray-50 rounded p-3 mb-4 border border-gray-100">
+                 <div className="flex justify-between text-xs mb-2">
+                   <span className="text-gray-500 font-semibold">Sold By</span>
+                   <span className="text-gray-800 font-bold">{selectedWishlistItem.seller || deliveryInfo.sellerName}</span>
+                 </div>
+                 <div className="flex justify-between text-xs">
+                   <span className="text-gray-500 font-semibold">Delivery</span>
+                   <div className="text-right">
+                     <span className="text-green-700 font-bold block">{deliveryInfo.estimatedDays} Business Days</span>
+                     <span className="text-gray-500 text-[10px]">Free Delivery</span>
+                   </div>
+                 </div>
+              </div>
+
+              {/* Size Selection */}
+              <div className="mb-4">
+                <p className="text-sm font-bold mb-2">Select Size</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedWishlistItem.sizes && selectedWishlistItem.sizes.split(',').map((size, index) => (
+                    <button 
+                      key={index}
+                      onClick={() => setTempSize(size.trim())}
+                      className={`w-10 h-10 flex items-center justify-center border text-sm rounded font-semibold transition-colors ${
+                        tempSize === size.trim() 
+                          ? 'border-slate-800 bg-slate-800 text-white' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {size.trim()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color Selection */}
+              <div className="mb-4">
+                <p className="text-sm font-bold mb-2">Select Color</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedWishlistItem.colors && selectedWishlistItem.colors.split(',').map((color, index) => (
+                    <button 
+                      key={index}
+                      onClick={() => setTempColor(color.trim())}
+                      className={`px-3 py-1 text-xs border rounded font-semibold transition-colors ${
+                        tempColor === color.trim() 
+                          ? 'border-slate-800 bg-slate-800 text-white' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {color.trim()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer / Action Button */}
+            <div className="p-4 border-t bg-gray-50">
+              <button 
+                onClick={handleConfirmMoveToCart}
+                className="w-full py-3 bg-pink-500 text-white font-bold rounded hover:bg-pink-600 transition-colors shadow-md active:scale-95 transform duration-150"
+              >
+                DONE
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1845,7 +2043,7 @@ const ShoppingCartPage = ({ setCurrentPage }) => {
     calculateDiscount,
     calculateGST,
     calculateFinalTotal
-  } = React.useContext(CartContext);
+  } = useContext(CartContext);
   
   // Function to calculate GST-inclusive price
   const calculateGSTInclusivePrice = (price, category) => {
@@ -1936,7 +2134,7 @@ const ShoppingCartPage = ({ setCurrentPage }) => {
         onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
       />
       
-      {/* Menu Dropdown add fixed inset-0 bg-black/60 backdrop-blur-sm*/}
+      {/* Menu Dropdown */}
       {isMenuOpen && (
         <div className="fixed inset-0 bg-opacity-50 z-50" onClick={() => setIsMenuOpen(false)}>
           <div className="bg-white w-64 h-full shadow-lg" onClick={(e) => e.stopPropagation()}>
@@ -1980,7 +2178,7 @@ const ShoppingCartPage = ({ setCurrentPage }) => {
             <p className="text-gray-600 mb-6">Looks like you haven't added anything to your cart yet.</p>
             <button 
               onClick={() => setCurrentPage('landing')}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+              className="px-6 py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
             >
               Continue Shopping
             </button>
@@ -1989,142 +2187,136 @@ const ShoppingCartPage = ({ setCurrentPage }) => {
           <div className="grid md:grid-cols-3 gap-8">
             {/* Cart Items */}
             <div className="md:col-span-2">
-  <h2 className="text-xl font-bold text-gray-800 mb-6">Cart Items ({cartItems.length})</h2>
-  <div className="space-y-4">
-    {cartItems.map((item) => {
-      const inclusivePrice = calculateGSTInclusivePrice(item.price, item.category);
-      const inclusiveOriginalPrice = calculateGSTInclusivePrice(item.originalPrice, item.category);
-      const discountPercentage = Math.round((1 - inclusivePrice / inclusiveOriginalPrice) * 100);
-      const itemCredits = (inclusivePrice / 10).toFixed(2);
-      
-      return (
-        <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-          <div className="flex flex-col md:flex-row gap-4">
-            <img 
-              src={item.images[0]} 
-              alt={item.name} 
-              className="w-full md:w-24 h-32 object-cover rounded"
-            />
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">{item.name}</h3>
-              <p className="text-sm text-gray-500">{item.brand}</p>
-              <div className="flex flex-wrap gap-2 mt-1">
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  Size: {item.selectedSize}
-                </span>
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                  </svg>
-                  Color: {item.selectedColor}
-                </span>
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                  Qty: {item.quantity}
-                </span>
+              <h2 className="text-xl font-bold text-gray-800 mb-6">Cart Items ({cartItems.length})</h2>
+              <div className="space-y-4">
+                {cartItems.map((item) => {
+                  const inclusivePrice = calculateGSTInclusivePrice(item.price, item.category);
+                  const inclusiveOriginalPrice = calculateGSTInclusivePrice(item.originalPrice, item.category);
+                  const discountPercentage = Math.round((1 - inclusivePrice / inclusiveOriginalPrice) * 100);
+                  const itemCredits = (inclusivePrice / 10).toFixed(2);
+                  
+                  return (
+                    <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="bg-white border border-gray-200 rounded p-4">
+                      <div className="flex flex-col md:flex-row gap-4">
+                        <img 
+                          src={item.images[0]} 
+                          alt={item.name} 
+                          className="w-full md:w-24 h-32 object-cover rounded"
+                        />
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg">{item.name}</h3>
+                          
+                          {/* Badges: Size, Color, Qty */}
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
+                              Size: {item.selectedSize}
+                            </span>
+                            <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
+                              Color: {item.selectedColor}
+                            </span>
+                            <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
+                              Qty: {item.quantity}
+                            </span>
+                          </div>
+                          
+                          {/* Price & Credits */}
+                          <div className="flex items-center justify-between gap-2 mt-1">
+                            <div className="flex items-center flex-wrap">
+                              <span className="font-bold text-lg">₹{inclusivePrice}</span>
+                              {item.originalPrice > item.price && (
+                                <span className="text-sm text-gray-500 line-through ml-2">₹{inclusiveOriginalPrice}</span>
+                              )}
+                              {item.originalPrice > item.price && (
+                                <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-1 rounded font-bold">
+                                  {discountPercentage}% OFF
+                                </span>
+                              )}
+                              <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
+                                {itemCredits * item.quantity} Credits
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center border border-gray-300 rounded">
+                              <button 
+                                onClick={() => updateQuantity(item.id, item.selectedSize, item.selectedColor, item.quantity - 1)}
+                                className="px-3 py-4 hover:bg-red-100 transition-colors duration-200 flex items-center justify-center disabled:opacity-40"
+                              >
+                                <Minus size={16} />
+                              </button>
+                              <span className="px-4 py-2 min-w-[10px] text-center font-medium">
+                                {item.quantity}
+                              </span>
+                              <button 
+                                onClick={() => updateQuantity(item.id, item.selectedSize, item.selectedColor, item.quantity + 1)}
+                                className="px-3 py-4 hover:bg-green-100 transition-colors duration-200 flex items-center justify-center disabled:opacity-40"
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {/* UPDATED: Brand Name moved here (Below everything else) */}
+                          <p className="text-sm text-gray-500 mt-1">{item.brand}</p>
+                          
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleRemoveClick(item)}
+                              className="px-3 py-1 border border-red-300 text-red-600 text-sm rounded hover:bg-red-50 transition-colors font-semibold"
+                            >
+                              Remove
+                            </button>
+                            <button 
+                              onClick={() => moveToWishlist(item.id, item.selectedSize, item.selectedColor)}
+                              className="px-3 py-1 border border-blue-300 text-blue-600 text-sm rounded hover:bg-blue-50 transition-colors font-semibold"
+                            >
+                              Move to Wishlist
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className="font-bold text-lg">₹{inclusivePrice}</span>
-                  {item.originalPrice > item.price && (
-                    <span className="text-sm text-gray-500 line-through ml-2">₹{inclusiveOriginalPrice}</span>
-                  )}
-                  {item.originalPrice > item.price && (
-                    <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-1 rounded font-bold">
-                      {discountPercentage}% OFF
-                    </span>
-                  )}
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
-                    {itemCredits * item.quantity} Credits
-                  </span>
+        
+              {/* Order Summary */}
+              <div className="mt-8 bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Order Summary</h3>
+                
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total MRP (Inclusive of all taxes)</span>
+                    <div className="flex items-center">
+                      <span className="font-semibold">₹{calculateGSTInclusiveTotal()}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Discount</span>
+                    <div className="flex items-center">
+                      <span className="font-semibold text-green-600">-₹{calculateGSTInclusiveDiscount()}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                    <span>Total</span>
+                    <div className="flex items-center">
+                      <span>₹{calculateGSTInclusiveTotal()}</span>
+                    </div>
+                  </div>
                 </div>
                 
-                <div className="flex items-center border border-gray-300 rounded">
-                  <button 
-                    onClick={() => updateQuantity(item.id, item.selectedSize, item.selectedColor, item.quantity - 1)}
-                    className="px-3 py-4 hover:bg-red-100 transition-colors duration-200 flex items-center justify-center disabled:opacity-40"
-                  >
-                    <Minus size={16} />
-                  </button>
-                  <span className="px-4 py-2 min-w-[10px] text-center font-medium">
-                    {item.quantity}
-                  </span>
-                  <button 
-                    onClick={() => updateQuantity(item.id, item.selectedSize, item.selectedColor, item.quantity + 1)}
-                    className="px-3 py-4 hover:bg-green-100 transition-colors duration-200 flex items-center justify-center disabled:opacity-40"
-                  >
-                    <PlusIcon size={16} />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
                 <button 
-                  onClick={() => handleRemoveClick(item)}
-                  className="px-3 py-1 border border-red-300 text-red-600 text-sm rounded hover:bg-red-50 transition-colors font-semibold"
+                  onClick={() => setCurrentPage('checkout')}
+                  className="w-full mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
                 >
-                  Remove
-                </button>
-                <button 
-                  onClick={() => moveToWishlist(item.id, item.selectedSize, item.selectedColor)}
-                  className="px-3 py-1 border border-blue-300 text-blue-600 text-sm rounded hover:bg-blue-50 transition-colors font-semibold"
-                >
-                  Move to Wishlist
+                  Proceed to Checkout
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      );
-    })}
-  </div>
-  
-  {/* Order Summary */}
-  <div className="mt-8 bg-gray-50 rounded-lg p-6">
-    <h3 className="text-lg font-bold text-gray-800 mb-4">Order Summary</h3>
-    
-    <div className="space-y-2 mb-4">
-      <div className="flex justify-between">
-        <span className="text-gray-600">Total MRP (Inclusive of all taxes)</span>
-        <div className="flex items-center">
-          <span className="font-semibold">₹{calculateGSTInclusiveTotal()}</span>
           
-        </div>
-      </div>
-      <div className="flex justify-between">
-        <span className="text-gray-600">Discount</span>
-        <div className="flex items-center">
-          <span className="font-semibold text-green-600">-₹{calculateGSTInclusiveDiscount()}</span>
-         
-        </div>
-      </div>
-      <div className="flex justify-between text-lg font-bold pt-2 border-t">
-        <span>Total</span>
-        <div className="flex items-center">
-          <span>₹{calculateGSTInclusiveTotal()}</span>
-        </div>
-      </div>
-    </div>
-    
-    <button 
-      onClick={() => setCurrentPage('checkout')}
-      className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-    >
-      Proceed to Checkout
-    </button>
-  </div>
-</div>
-            
-            {/* Right Sidebar - Could be empty or have recommendations */}
+            {/* Right Sidebar - Recommendations */}
             <div>
               <h3 className="text-lg font-bold text-gray-800 mb-4">You may also like</h3>
-              
               <div className="space-y-4">
                 {productsData.slice(0, 3).map((product) => {
                   const inclusivePrice = calculateGSTInclusivePrice(product.price, product.category);
@@ -2404,27 +2596,18 @@ const CheckoutPage = ({ setCurrentPage }) => {
                   <h3 className="font-semibold">{item.name}</h3>
                   <div className="flex flex-wrap gap-2 mb-2">
                    <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
-                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                     </svg>
                    Size: {item.selectedSize}
                    </span>
                    <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                     </svg>
                       Color: {item.selectedColor}
                       </span>
                        <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
-                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
                       Qty: {item.quantity}
                     </span>
                     </div>
                   <div className="flex items-center mb-4">
-                    <span className="font-semibold">₹{inclusivePrice * item.quantity}</span>
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
+                    <span className="font-bold">₹{inclusivePrice * item.quantity}</span>
+                    <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
                      {itemCredits * item.quantity} Credits
                     </span>
                   </div>
@@ -2456,7 +2639,7 @@ const CheckoutPage = ({ setCurrentPage }) => {
         
         <button 
           onClick={handleCompletePurchase}
-          className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          className="w-full mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
         >
           Complete Purchase
         </button>
@@ -2702,13 +2885,13 @@ const CheckoutPage = ({ setCurrentPage }) => {
         <div className="flex gap-3">
           <button 
             onClick={() => setCurrentPage('cart')}
-            className="flex-1 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors font-semibold"
+            className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
           >
             Continue Shopping
           </button>
           <button 
             onClick={handleCompletePurchase}
-            className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+            className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
           >
             Pay Now
           </button>
@@ -3001,28 +3184,19 @@ const OrderSummaryPage = ({ setCurrentPage }) => {
               <h3 className="font-semibold text-lg">{item.name}</h3>
               <p className="text-sm text-gray-500">{item.brand}</p>
               <div className="flex flex-wrap gap-2 mt-1">
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
+                <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-gray-100 text-gray-800">
                   Size: {item.selectedSize}
                 </span>
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                  </svg>
+                <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-gray-100 text-gray-800">
                   Color: {item.selectedColor}
                 </span>
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
+                <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-gray-100 text-gray-800">
                   Qty: {item.quantity}
                 </span>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
+
+              <div className="flex items-center justify-between gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1">
                   <span className="font-bold text-lg">₹{inclusivePrice}</span>
                   {item.originalPrice > item.price && (
                     <span className="text-sm text-gray-500 line-through ml-2">₹{inclusiveOriginalPrice}</span>
@@ -3032,7 +3206,7 @@ const OrderSummaryPage = ({ setCurrentPage }) => {
                       {discountPercentage}% OFF
                     </span>
                   )}
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
+                  <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
                     {itemCredits * item.quantity} Credits
                   </span>
                 </div>
@@ -3048,15 +3222,15 @@ const OrderSummaryPage = ({ setCurrentPage }) => {
               {/* Billing Details */}
               <div>
                 <div className="bg-gray-50 rounded-lg p-6">
-                  <h2 className="text-lg font-bold text-gray-800 mb-4">Billing Details</h2>
+                  <h2 className="text-lg font-bold text-gray-800 mb-4">Price Details</h2>
                   
                   <div className="space-y-2 mb-6">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Subtotal (Inclusive of all taxes)</span>
+                      <span className="text-gray-600">Total price(Inclusive of all taxes)</span>
                       <span className="font-semibold">₹{inclusiveOrderTotal}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Shipping</span>
+                      <span className="text-gray-600">Delivery</span>
                       <span className="font-semibold">FREE</span>
                     </div>
                     {latestOrder.paymentMethod === 'credits' && (
@@ -3074,13 +3248,13 @@ const OrderSummaryPage = ({ setCurrentPage }) => {
                   <div className="flex gap-3">
                     <button 
                       onClick={() => setCurrentPage('orderTracking')}
-                      className="flex-1 py-2 border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors font-semibold"
+                      className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
                     >
                       Track Order
                     </button>
                     <button 
                       onClick={() => setCurrentPage('landing')}
-                      className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+                      className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
                     >
                       Continue Shopping
                     </button>
@@ -3096,7 +3270,7 @@ const OrderSummaryPage = ({ setCurrentPage }) => {
             <p className="text-gray-600 mb-6">You haven't placed any orders yet.</p>
             <button 
               onClick={() => setCurrentPage('landing')}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+              className="px-6 py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
             >
               Start Shopping
             </button>
@@ -3292,7 +3466,7 @@ const OrderHistoryPage = ({ setCurrentPage }) => {
             </p>
             <button 
               onClick={() => setCurrentPage('landing')}
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-sm"
+              className="px-6 py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
             >
               Start Shopping
             </button>
@@ -3666,7 +3840,7 @@ const OrderTrackingPage = ({ setCurrentPage }) => {
                   {trackingStages.map((stage, index) => (
                     <div key={index} className="flex items-start gap-4">
                       <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center ${
-                        stage.completed ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-600'
+                        stage.completed ? 'bg-slate-600 text-white' : 'bg-gray-300 text-gray-600'
                       }`}>
                         {stage.icon}
                       </div>
@@ -3695,38 +3869,29 @@ const OrderTrackingPage = ({ setCurrentPage }) => {
     const itemCredits = (inclusivePrice / 10).toFixed(2);
     
     return (
-      <div key={index} className="flex gap-4 pb-4 border-b last:border-b-0">
+      <div key={index} className="flex gap-4 border-b last:border-b-0">
         <img 
           src={item.images[0]} 
           alt={item.name} 
           className="w-16 h-20 object-cover rounded"
         />
         <div className="flex-1">
-              <h3 className="font-semibold text-lg">{item.name}</h3>
+              <h3 className="font-semibold text-sm">{item.name}</h3>
               <p className="text-sm text-gray-500">{item.brand}</p>
               <div className="flex flex-wrap gap-2 mt-1">
                 <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
                   Size: {item.selectedSize}
                 </span>
                 <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                  </svg>
                   Color: {item.selectedColor}
                 </span>
                 <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
                   Qty: {item.quantity}
                 </span>
               </div>
               
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
+              <div className="flex items-center justify-between mt-1 mb-2">
+                <div className="flex items-center gap-2">
                   <span className="font-bold text-lg">₹{inclusivePrice}</span>
                   {item.originalPrice > item.price && (
                     <span className="text-sm text-gray-500 line-through ml-2">₹{inclusiveOriginalPrice}</span>
@@ -3736,7 +3901,7 @@ const OrderTrackingPage = ({ setCurrentPage }) => {
                       {discountPercentage}% OFF
                     </span>
                   )}
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
+                  <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
                     {itemCredits * item.quantity} Credits
                   </span>
                 </div>
@@ -3750,7 +3915,7 @@ const OrderTrackingPage = ({ setCurrentPage }) => {
             
             {/* Billing Details */}
             <div className="bg-gray-50 rounded-lg p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Billing Details</h2>
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Price Details</h2>
               
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -3781,7 +3946,7 @@ const OrderTrackingPage = ({ setCurrentPage }) => {
             <p className="text-gray-600 mb-6">You haven't placed any orders yet.</p>
             <button 
               onClick={() => setCurrentPage('landing')}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+              className="px-6 py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
             >
               Start Shopping
             </button>
@@ -3798,12 +3963,17 @@ const OrderTrackingPage = ({ setCurrentPage }) => {
 const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productModalOpen, setProductModalOpen] = useState(false);
+  
+  // State for the intermediate selection modal (Quick Add)
+  const [selectionModalOpen, setSelectionModalOpen] = useState(false);
+  
   const [activeProductSlide, setActiveProductSlide] = useState(0);
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
   const [filters, setFilters] = useState({
     categories: [],
     brands: [],
@@ -3813,69 +3983,56 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
     minPrice: '',
     maxPrice: ''
   });
+  
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const companyDropdownRef = useRef(null);
-  // Add these state variables at the top of your component
+  
+  // Delivery State
   const [deliveryPincode, setDeliveryPincode] = useState('');
   const [deliveryInfo, setDeliveryInfo] = useState(null);
+  const [pincodeChecked, setPincodeChecked] = useState(false);
 
-  // Add this function to handle checking delivery availability
   const checkDeliveryAvailability = (pincode) => {
     if (!pincode || pincode.length < 6) {
       alert('Please enter a valid pincode');
       return;
     }
-  
-    // Here you would typically make an API call to check delivery availability
-    // For now, I'm just showing a mock response
     setDeliveryInfo({
       estimatedDays: '3-5',
       deliveryCharge: 'FREE',
       returnAvailable: true
     });
+    setPincodeChecked(true);
   };
   
-  const { addToCart, addToWishlist } = React.useContext(CartContext);
+  // Update this line at the top of your component
+  const { addToCart, addToWishlist, removeFromWishlist, wishlistItems } = React.useContext(CartContext); 
   
-  // Function to calculate GST-inclusive price
+  // --- Helper Functions ---
+  
   const calculateGSTInclusivePrice = (price, category) => {
-    // Get GST rate based on price and category
-    let gstRate = 0.18; // Default 18%
+    let gstRate = 0.18; 
     if (category === 'Clothing') {
       gstRate = price <= 2500 ? 0.05 : 0.18;
     }
-    
-    // Calculate GST-inclusive price
     return Math.round(price * (1 + gstRate));
   };
   
-  // Function to calculate credits based on price (1/100th of the price)
   const calculateCredits = (price) => {
     return (price / 100).toFixed(2);
   };
   
-  // Function to calculate GST rate based on product price and category
   const getGSTRate = (price, category) => {
-    // For clothing items
     if (category === 'Clothing') {
-      // Clothes up to ₹2,500 per piece → 5% GST
-      if (price <= 2500) {
-        return 0.05; // 5%
-      }
-      // Clothes above ₹2,500 per piece → 18% GST
-      else {
-        return 0.18; // 18%
-      }
-    }
-    // For accessories and other items
-    else {
-      // For accessories like watches and handbags, using 18% GST
-      // This can be adjusted based on specific GST rules for accessories
-      return 0.18; // 18%
+      if (price <= 2500) return 0.05;
+      else return 0.18;
+    } else {
+      return 0.18;
     }
   };
   
-  // Filter products based on category
+  // --- Filter Logic ---
+  
   const getFilteredProducts = () => {
     let products = [];
     
@@ -3893,7 +4050,6 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
          p.subCategory?.includes('Blouse')));
     }
     
-    // Apply additional filters
     if (filters.categories.length > 0) {
       products = products.filter(p => 
         filters.categories.some(cat => p.subCategory?.toLowerCase().includes(cat.toLowerCase()))
@@ -3925,7 +4081,7 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
     if (filters.discount) {
       const minDiscount = parseInt(filters.discount);
       products = products.filter(p => {
-        const originalPrice = p.discountedPrice || p.price * 1.2; // Fallback if no discounted price
+        const originalPrice = p.discountedPrice || p.price * 1.2; 
         const discount = Math.round((1 - p.price / originalPrice) * 100);
         return discount >= minDiscount;
       });
@@ -3942,12 +4098,13 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
     return products;
   };
   
-  // Filter products based on search query
   const filteredProducts = getFilteredProducts().filter(product => 
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.brandName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.type.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  // --- Handlers ---
   
   const getPageTitle = () => {
     switch(category) {
@@ -3961,7 +4118,6 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
   
   const handleSearch = (e) => {
     e.preventDefault();
-    // Search is already handled by filteredProducts
   };
   
   const handleFilterChange = (filterType, value) => {
@@ -3990,41 +4146,84 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
       maxPrice: ''
     });
   };
-  
+
+  // Opens the intermediate selection modal (Unselects previous choices)
+  const initiateAddToCart = (product) => {
+    setSelectedProduct(product);
+    // Requirement: Unselect previously
+    setSelectedSize('');
+    setSelectedColor('');
+    setSelectionModalOpen(true);
+  };
+
   const handleAddToCart = (product) => {
+    // This is used inside the main modal
     if (!selectedSize || !selectedColor) {
       alert('Please select size and color');
       return;
     }
-    
     addToCart(product, selectedSize, selectedColor);
     setProductModalOpen(false);
+    setSelectionModalOpen(false);
     alert('Product added to cart!');
   };
   
-  const handleAddToWishlist = (product) => {
+  // Handles "Done" button in selection modal
+  const handleSelectionDone = () => {
     if (!selectedSize || !selectedColor) {
-      alert('Please select size and color');
+      alert('Please select both size and color to proceed.');
       return;
     }
-    
-    addToWishlist(product, selectedSize, selectedColor);
-    alert('Product added to wishlist!');
+    // Close modal and add
+    setSelectionModalOpen(false);
+    addToCart(selectedProduct, selectedSize, selectedColor);
+    alert('Product added to cart!');
+    // Reset
+    setSelectedSize('');
+    setSelectedColor('');
   };
+  
+  // UPDATED: Silent Wishlist Add (No alerts, no questions)
+  // UPDATED: Toggle Wishlist Function
+const handleAddToWishlist = (product) => {
+  // Check if this product is already in the wishlist
+  const existingItem = wishlistItems.find((item) => item.id === product.id);
+
+  if (existingItem) {
+    // If it exists, remove it (Toggle OFF)
+    // We use the size/color stored in the wishlist item to remove it correctly
+    removeFromWishlist(existingItem.id, existingItem.selectedSize, existingItem.selectedColor);
+  } else {
+    // If it doesn't exist, add it (Toggle ON)
+    let sizeToUse = selectedSize;
+    let colorToUse = selectedColor;
+
+    // Default to first available if not selected
+    if (!sizeToUse && product.sizes) {
+      sizeToUse = product.sizes.split(',')[0].trim();
+    }
+    if (!colorToUse && product.colors) {
+      colorToUse = product.colors.split(',')[0].trim();
+    }
+
+    addToWishlist(product, sizeToUse, colorToUse);
+  }
+};
   
   const handleShareProduct = (product) => {
     setSelectedProduct(product);
     setShareModalOpen(true);
   };
   
+  // --- Render ---
+
   return (
     <div className="min-h-screen bg-white">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;500;600;700;800&display=swap');
-        
-        * {
-          font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-        }
+        * { font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; }
+        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
       
       <Header 
@@ -4062,7 +4261,7 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
               setIsFilterOpen={setIsFilterOpen}
             />
             
-            {/* Products Section -hover:shadow-xl- , rounded-lg shadow-md*/}
+            {/* Products Section */}
             <div className="flex-1">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">
@@ -4080,21 +4279,21 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
               {filteredProducts.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
-                  <button 
-                    onClick={clearFilters}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
-                  >
+                  <button onClick={clearFilters} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold">
                     Clear Filters
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   {filteredProducts.map((product) => {
-                    const inclusivePrice = calculateGSTInclusivePrice(product.price, product.category);
-                    const inclusiveDiscountedPrice = product.discountedPrice 
-                      ? calculateGSTInclusivePrice(product.discountedPrice, product.category)
-                      : null;
-                    const credits = calculateCredits(inclusivePrice);
+                    const sellingPrice = calculateGSTInclusivePrice(product.price, product.category);
+                    // Calculate MRP (Higher price)
+                    const mrp = product.discountedPrice && product.discountedPrice > product.price 
+                        ? calculateGSTInclusivePrice(product.discountedPrice, product.category)
+                        : Math.round(sellingPrice * 1.2);
+                    
+                    const credits = calculateCredits(sellingPrice);
+                    const discountPercent = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
                     
                     return (
                       <div key={product.id} className="bg-white overflow-hidden group transition-shadow">
@@ -4107,18 +4306,20 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                           <button 
                             onClick={() => {
                               setSelectedProduct(product);
-                              setSelectedSize(product.sizes ? product.sizes.split(',')[0].trim() : '');
-                              setSelectedColor(product.colors ? product.colors.split(',')[0].trim() : '');
+                              // Requirement: Unselect previously
+                              setSelectedSize('');
+                              setSelectedColor('');
+                              setActiveProductSlide(0);
                               setProductModalOpen(true);
                             }}
                             className="absolute inset-0 flex items-center justify-center transition-all"
-                          >
-                          </button>
-                          {product.discountedPrice && product.price < product.discountedPrice && (
+                          ></button>
+                          {/* 
+                          {discountPercent > 0 && (
                             <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-semibold">
-                              {Math.round((1 - inclusivePrice / inclusiveDiscountedPrice) * 100)}% OFF
+                              {discountPercent}% OFF
                             </div>
-                          )}
+                          )}*/}
                         </div>
                         
                         <div className="p-4">
@@ -4133,46 +4334,73 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                             </div>
                             <span className="text-xs text-gray-500 ml-1 font-semibold">({product.reviews || 100})</span>
                           </div>
+
+                          <div className="flex items-center flex-nowrap gap-1 mb-1">
+                            <span className="font-bold text-lg text-gray-900 whitespace-nowrap">
+                                ₹{sellingPrice}
+                            </span>
+                            {/*<span className="text-sm text-gray-400 line-through whitespace-nowrap">
+                                MRP ₹{mrp}
+                           </span>*/}
+                            <span className="bg-green-100 text-green-600 text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">
+                               {credits} credit
+                            </span>
+                               {discountPercent > 0 && (
+                           <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">
+                               {discountPercent}% OFF
+                           </span>
+                             )}
+                           </div>
                           
-                          <div className="flex items-center mb-2">
-                            <div className="flex items-center center mb-2">
-                              <span className="font-bold text-lg">₹{inclusivePrice}</span>
-                              <span className="text-xs text-gray-500 ml-1 font-semibold">({credits})</span>
+                          {/* Requirement: Price Update (MRP + Selling Price + Credits)
+                          <div className="flex flex-col mb-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs text-gray-500 line-through">MRP: ₹ {mrp}</span>
+                              <span className="font-bold text-lg text-gray-900">₹ {sellingPrice}</span>
+                              <span className="text-xs text-green-600 font-semibold bg-green-50 px-1 rounded">
+                                {credits} Credit
+                              </span>
                             </div>
-                            {product.discountedPrice && product.price < product.discountedPrice && (
-                              <span className="text-sm text-gray-500 line-through ml-1">₹{inclusiveDiscountedPrice}</span>
-                            )}
-                          </div>
+                          </div>*/}
+                          
                           <div className="flex space-x-2">
                             <button 
                               onClick={() => {
                                 setSelectedProduct(product);
-                                setSelectedSize(product.sizes ? product.sizes.split(',')[0].trim() : '');
-                                setSelectedColor(product.colors ? product.colors.split(',')[0].trim() : '');
+                                setSelectedSize('');
+                                setSelectedColor('');
+                                setActiveProductSlide(0);
                                 setProductModalOpen(true);
                               }}
-                              className="flex-1 px-3 py-1.5 border border-blue-600 text-blue-600 text-sm rounded hover:bg-blue-50 transition-colors font-semibold"
+                              className="flex-1 px-3 py-1.5 border border-slate-300 text-slate-600 text-sm rounded hover:bg-slate-20 transition-colors font-bold"
                             >
                               View Details
                             </button>
+                            {/* Silent Wishlist Button */}
                             <button 
-                              onClick={() => {
-                                setSelectedProduct(product);
-                                setSelectedSize(product.sizes ? product.sizes.split(',')[0].trim() : '');
-                                setSelectedColor(product.colors ? product.colors.split(',')[0].trim() : '');
-                                handleAddToWishlist(product);
-                              }}
-                              className="p-1.5 border border-red-600 text-red-600 rounded hover:bg-red-50 transition-colors"
+                             onClick={() => handleAddToWishlist(product)}
+                             className="p-1.5 border border-slate-100 text-red-600 rounded hover:bg-slate-20 transition-colors font-bold"
                             >
-                              <Heart size={16} />
-                            </button>
+                           <Heart 
+                            size={16} 
+                            // If in wishlist, fill it with current color (Red). Otherwise, empty outline.
+                            fill={wishlistItems.some((item) => item.id === product.id) ? 'currentColor' : 'none'}
+                            />
+                             </button>
                             <button 
                               onClick={() => handleShareProduct(product)}
-                              className="p-1.5 border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              className="p-1.5 border border-slate-100 text-green-600 rounded hover:bg-slate-20 transition-colors font-bold"
                             >
                               <Share2 size={16} />
                             </button>
                           </div>
+                          {/* Grid "Add to Cart" triggers the Modal */}
+                          <button 
+                            onClick={() => initiateAddToCart(product)}
+                            className="w-full mt-2 px-3 py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+                          >
+                            Add to Cart
+                          </button>
                         </div>
                       </div>
                     );
@@ -4184,10 +4412,9 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
         </div>
       </section>
       
-      {/* Footer */}
       <Footer />
       
-      {/* Product Details Modal Remove - /60 backdrop-blur-sm transition-opacity*/}
+      {/* MAIN PRODUCT DETAILS MODAL */}
       {productModalOpen && selectedProduct && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -4200,6 +4427,7 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
               </div>
              
              <div className="grid md:grid-cols-2 gap-6">
+               {/* Left Column: Images */}
                <div>
                  <div className="relative">
                    <img 
@@ -4230,30 +4458,31 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                    ))}
                  </div>
 
+                 {/* RESTORED: Product Video Section */}
                  {selectedProduct.videoLink && (
-                         <div className="mt-4">
-                           <h4 className="font-bold mb-2">Product Video</h4>
-                           <div className="relative">
-                             <div className="bg-gray-200 rounded-lg overflow-hidden h-50 flex items-center justify-center">
-                               <div className="text-center">
-                                 <div className="bg-gradient-to-r from-pink-500 to-orange-400 bg-opacity-80 rounded-full p-3 inline-block mb-2">
-                                   <Instagram size={24} className="text-white" />
-                                 </div>
-                                 <p className="text-white font-semibold">View on Instagram</p>
-                               </div>
-                             </div>
-                             <a 
-                               href={selectedProduct.videoLink} 
-                               target="_blank" 
-                               rel="noopener noreferrer"
-                               className="absolute inset-0 flex items-center justify-center"
-                             >
-                             </a>
-                           </div>
+                   <div className="mt-4">
+                     <h4 className="font-bold mb-2">Product Video</h4>
+                     <div className="relative">
+                       <div className="bg-gray-200 rounded-lg overflow-hidden h-48 flex items-center justify-center group cursor-pointer border border-gray-300">
+                         <div className="bg-gradient-to-r from-pink-500 to-orange-400 bg-opacity-90 rounded-full p-3 inline-block mb-2 shadow-md transform group-hover:scale-110 transition-transform">
+                           <Instagram size={24} className="text-white" />
                          </div>
-                       )}  
+                         <div className="absolute bottom-4 w-full text-center pointer-events-none">
+                           {/*<p className="text-gray-800 font-semibold text-sm">View on Instagram</p>*/}
+                         </div>
+                       </div>
+                       <a 
+                         href={selectedProduct.videoLink} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         className="absolute inset-0"
+                       ></a>
+                     </div>
+                   </div>
+                 )}
                </div>
                
+               {/* Right Column: Details */}
                <div>
                  <p className="text-sm text-gray-500 mb-2 font-semibold">{selectedProduct.brandName}</p>
                  <h4 className="text-xl font-bold mb-4">{selectedProduct.name}</h4>
@@ -4267,30 +4496,35 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                    <span className="text-sm text-gray-500 ml-2 font-semibold">({selectedProduct.reviews || 100} reviews)</span>
                  </div>
                  
-                 <div className="flex items-center mb-2">
+                 {/* Requirement: Price Display */}
+                 <div className="mb-4 p-1">
                    {(() => {
-                     const inclusivePrice = calculateGSTInclusivePrice(selectedProduct.price, selectedProduct.category);
-                     const inclusiveDiscountedPrice = selectedProduct.discountedPrice 
-                       ? calculateGSTInclusivePrice(selectedProduct.discountedPrice, selectedProduct.category)
-                       : null;
-                     const credits = calculateCredits(inclusivePrice);
-                     
+                     const sellingPrice = calculateGSTInclusivePrice(selectedProduct.price, selectedProduct.category);
+                     const mrp = selectedProduct.discountedPrice && selectedProduct.discountedPrice > selectedProduct.price 
+                        ? calculateGSTInclusivePrice(selectedProduct.discountedPrice, selectedProduct.category)
+                        : Math.round(sellingPrice * 1.2);
+                     const credits = calculateCredits(sellingPrice);
+                     const discountPercent = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+
                      return (
-                       <>
-                         <div className="flex items-center mb-4">
-                           <span className="text-2xl font-bold">₹{inclusivePrice}</span>
-                           <span className="text-sm text-gray-500 ml-2 font-semibold">({credits})</span>
-                           <span className="text-sm text-gray-500 ml-2">(Inclusive of all taxes)</span>
+                       <div className="flex flex-col gap-1">
+                         <div className="flex items-center gap-2">
+                          
+                           <span className="text-2xl font-bold text-gray-900">₹{sellingPrice}</span>
+                           <span className="text-sm font-medium text-gray-300 line-through">MRP ₹{mrp}</span>
+                           {discountPercent > 0 && (
+                             <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">
+                               {discountPercent}% OFF
+                             </span>
+                           )}
                          </div>
-                         {selectedProduct.discountedPrice && selectedProduct.price < selectedProduct.discountedPrice && (
-                           <span className="text-lg text-gray-500 line-through ml-3">₹{inclusiveDiscountedPrice}</span>
-                         )}
-                         {selectedProduct.discountedPrice && selectedProduct.price < selectedProduct.discountedPrice && (
-                           <span className="ml-3 bg-red-100 text-red-600 text-sm px-2 py-1 rounded font-bold">
-                             {Math.round((1 - inclusivePrice / inclusiveDiscountedPrice) * 100)}% OFF
+                         <div className="flex items-center gap-2">
+                           <span className="bg-green-100 text-green-600 text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">
+                                {credits} Credit
                            </span>
-                         )}
-                       </>
+                           <span className="text-xs text-gray-500">Inclusive of all taxes</span>
+                         </div>
+                       </div>
                      );
                    })()}
                  </div>
@@ -4300,11 +4534,7 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                    <p className="text-sm text-gray-600 font-semibold">{selectedProduct.fitType}</p>
                  </div>
                  
-                 <div className="mb-4">
-                   <p className="text-sm font-bold mb-2">Type</p>
-                   <p className="text-sm text-gray-600 font-semibold">{selectedProduct.type}</p>
-                 </div>
-                 
+                 {/* Requirement: Available Colors Unselected */}
                  <div className="mb-4">
                    <p className="text-sm font-bold mb-2">Available Colors</p>
                    <div className="flex flex-wrap gap-2">
@@ -4314,8 +4544,8 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                          onClick={() => setSelectedColor(color.trim())}
                          className={`px-3 py-1 border rounded text-sm transition-colors font-semibold ${
                            selectedColor === color.trim() 
-                             ? 'border-blue-600 bg-blue-50 text-blue-600' 
-                             : 'border-gray-300 hover:bg-gray-100'
+                             ? 'border-black bg-gray-900 text-white shadow-md transform scale-105' 
+                             : 'border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black'
                          }`}
                        >
                          {color.trim()}
@@ -4324,19 +4554,23 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                    </div>
                  </div>
 
+                 {/* Requirement: Select Size Unselected & Size Chart */}
                  <div className="mb-4">
-                   <p className="text-sm font-bold mb-2">Select Size</p>
+                   <div className="flex justify-between items-center mb-2">
+                     <p className="text-sm font-bold">Select Size</p>
+                     <button className="text-sm text-blue-600 hover:underline font-bold" onClick={() => alert('Opening Size Chart...')}>Size Chart</button>
+                   </div>
                    <div className="flex flex-wrap gap-2">
                      {selectedProduct.sizes && selectedProduct.sizes.split(',').map((size, index) => (
                        <button 
-                         key={index}
-                         onClick={() => setSelectedSize(size.trim())}
-                         className={`px-3 py-1 border rounded text-sm transition-colors font-semibold ${
-                           selectedSize === size.trim() 
-                             ? 'border-blue-600 bg-blue-50 text-blue-600' 
-                             : 'border-gray-300 hover:bg-gray-100'
-                         }`}
-                       >
+                      key={index}
+                      onClick={() => setSelectedSize(size.trim())}
+                      className={`w-10 h-10 flex items-center justify-center border text-sm font-bold rounded-md transition-all duration-200 ${
+                        selectedSize === size.trim() 
+                          ? 'border-black bg-gray-900 text-white shadow-md transform scale-105' 
+                          : 'border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black'
+                      }`}
+                    >
                          {size.trim()}
                        </button>
                      ))}
@@ -4349,6 +4583,7 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                  </div>
                  
                  <div className="flex space-x-3 mt-3">
+                   {/* Silent Wishlist Button in Modal */}
                    <button 
                      onClick={() => handleAddToWishlist(selectedProduct)}
                      className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center justify-center"
@@ -4365,57 +4600,56 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                    </button>
                  </div>
                  <div className="flex space-x-3 mt-3">
-                         <button 
-                           onClick={() => handleAddToCart(selectedProduct)}
-                           className="flex-1 py-2 border border-gray-300 bg-gray-800 rounded hover:bg-transparent hover:text-slate-900 text-white text-sm font-medium cursor-pointer transition-all duration-300"
-                         >
-                           <span className="text-sm font-bold">Buy now</span>
-                         </button>
-                         <button 
-                           onClick={() => handleAddToCart(selectedProduct)}
-                           className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center justify-center"
-                         >
-                           <span className="text-sm font-bold">Add to cart</span>
-                         </button>
-                       </div>
+                   <button 
+                     onClick={() => { if(!selectedSize || !selectedColor) { alert('Please select size and color'); return; } handleAddToCart(selectedProduct); }}
+                     className="flex-1 py-2 border border-gray-300 bg-slate-800 rounded hover:bg-transparent hover:text-slate-900 text-white text-sm font-medium cursor-pointer transition-all duration-300"
+                   >
+                     <span className="text-sm font-bold">Buy now</span>
+                   </button>
+                   <button 
+                     onClick={() => { if(!selectedSize || !selectedColor) { alert('Please select size and color'); return; } handleAddToCart(selectedProduct); }}
+                     className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center justify-center"
+                   >
+                     <span className="text-sm font-bold">Add to cart</span>
+                   </button>
+                 </div>
                        
-                       {/* Delivery Pincode Section */}
-                       <div className="mt-4 p-3 border border-gray-200 rounded-lg">
-                         <p className="text-sm font-bold mb-2">Delivery Pincode:</p>
-                         <div className="flex items-center">
-                           <input 
-                             type="text" 
-                             placeholder="Enter" 
-                             className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500"
-                             onChange={(e) => setDeliveryPincode(e.target.value)}
-                             value={deliveryPincode || ''}
-                           />
-                           <button 
-                             className="ml-2 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                             onClick={() => checkDeliveryAvailability(deliveryPincode)}
-                           >
-                             Check
-                           </button>
-                         </div>
-                         {deliveryInfo && (
-                           <div className="mt-3 text-sm">
-                             <p className="text-green-600 font-medium mb-1">
-                               <span className="font-bold">Estimation:</span> {deliveryInfo.estimatedDays || '3-5'} business days
-                             </p>
-                             <p className="text-gray-600 font-medium mb-1">
-                               <span className="font-bold">Delivery charge:</span> {deliveryInfo.deliveryCharge || 'FREE'}
-                             </p>
-                             <p className="text-gray-600 font-medium mb-2">
-                               <span className="font-bold">Return and Exchange:</span> Available
-                             </p>
-                             <div className="bg-blue-50 p-2 rounded mt-2">
-                               <p className="text-xs text-blue-800">
-                                 Return a product and get the amount back as credits! Use them anytime for your next purchase and no expiry, no rush.
-                               </p>
-                             </div>
-                           </div>
-                         )}
-                       </div>
+                 {/* Delivery Pincode Section */}
+                 <div className="mt-4 p-3 border border-gray-300 rounded">
+                  <p className="text-sm font-bold mb-2">Delivery Pincode:</p>
+                   <div className="flex items-center">
+                    <input 
+                      type="text" 
+                      placeholder="Enter a Pincode" 
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-semibold focus:outline-none focus:border-slate-200"
+                      onChange={(e) => setDeliveryPincode(e.target.value)}
+                      value={deliveryPincode || ''}
+                      disabled={pincodeChecked}
+                    />
+                  <button 
+                    className={`ml-2 px-2.5 py-1 rounded text-sm font-semibold transition-all duration-200 transform hover:scale-105 ${pincodeChecked 
+                     ? 'bg-slate-700 hover:bg-slate-700 text-white' 
+                     : 'bg-slate-700 hover:bg-slate-700 text-white'}`}
+                    onClick={() => {
+                      if (pincodeChecked) {
+                       setPincodeChecked(false); setDeliveryInfo(null); setDeliveryPincode('');
+                      } else { checkDeliveryAvailability(deliveryPincode); }
+                    }}
+                   >
+                     {pincodeChecked ? 'Change' : 'Check'}
+                 </button>
+                </div>
+                {deliveryInfo && (
+                  <div className="mt-3 text-sm">
+                    <p className="text-green-600 font-medium mb-1"><span className="font-bold">Estimation:</span> {deliveryInfo.estimatedDays || '3-5'} business days</p>
+                    <p className="text-gray-600 font-medium mb-1"><span className="font-bold">Delivery charge:</span> {deliveryInfo.deliveryCharge || 'FREE'}</p>
+                    <p className="text-gray-600 font-medium mb-2"><span className="font-bold">Return and Exchange:</span> Available</p>
+                    <div className="bg-blue-50 p-2 rounded mt-2">
+                      <p className="text-xs font-semibold text-blue-600">Return a product and get the amount back as credits! Use them anytime for your next purchase and no expiry, no rush.</p>
+                    </div>
+                  </div>
+                )}
+                 </div>
                </div>
              </div>
              
@@ -4425,17 +4659,15 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                    <h5 className="font-bold mb-3">Product Details</h5>
                    <p className="text-sm text-gray-600 font-medium">{selectedProduct.shortDescription}</p>
                  </div>
-                 
                  <div>
                    <h5 className="font-bold mb-3">Material & Care</h5>
                    <p className="text-sm text-gray-600 mb-2 font-medium">Material: {selectedProduct.material}</p>
                    <p className="text-sm text-gray-600 font-medium">Care: {selectedProduct.washMethod}</p>
                  </div>
-                 
                  <div>
                    <h5 className="font-bold mb-3">Size & Fit</h5>
                    <p className="text-sm text-gray-600 mb-2 font-medium">Fit: {selectedProduct.fitType}</p>
-                   <button className="text-sm text-blue-600 hover:underline font-bold">Size Chart</button>
+                   <button className="text-sm text-blue-600 hover:underline font-bold" onClick={() => alert('Size Chart View')}>Size Chart</button>
                  </div>
                </div>
              </div>
@@ -4443,41 +4675,15 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
              <div className="mt-6 border-t pt-6">
                <h5 className="font-bold mb-3">Additional Information</h5>
                <div className="grid md:grid-cols-2 gap-4 text-sm">
-                 <div>
-                   <span className="font-medium">Category:</span> {selectedProduct.category} / {selectedProduct.subCategory}
-                 </div>
-                 <div>
-                   <span className="font-medium">SKU:</span> {selectedProduct.sku}
-                 </div>
-                 <div>
-                   <span className="font-medium">HSN Code:</span> {selectedProduct.hsnCode}
-                 </div>
-                 <div>
-                   <span className="font-medium">Stock:</span> {selectedProduct.stockQuantity} units
-                 </div>
-                 <div>
-                   <span className="font-medium">Package Dimensions:</span> {selectedProduct.packageDimensions}
-                 </div>
-                 <div>
-                   <span className="font-medium">Weight:</span> {selectedProduct.weight}
-                 </div>
-                 <div>
-                   <span className="font-medium">Delivery Availability:</span> {selectedProduct.deliveryAvailability}
-                 </div>
-                 <div>
-                   <span className="font-medium">COD Option:</span> {selectedProduct.codOption}
-                 </div>
-                 <div>
-                   <span className="font-medium">Country of Origin:</span> {selectedProduct.countryOfOrigin}
-                 </div>
-                 <div>
-                   <span className="font-medium">Credits:</span> <span className="text-gray-600 font-semibold">
-                     {(() => {
-                       const inclusivePrice = calculateGSTInclusivePrice(selectedProduct.price, selectedProduct.category);
-                       return calculateCredits(inclusivePrice);
-                     })()} Credits
-                   </span>
-                 </div>
+                 <div><span className="font-medium">Category:</span> {selectedProduct.category} / {selectedProduct.subCategory}</div>
+                 <div><span className="font-medium">SKU:</span> {selectedProduct.sku}</div>
+                 <div><span className="font-medium">HSN Code:</span> {selectedProduct.hsnCode}</div>
+                 <div><span className="font-medium">Stock:</span> {selectedProduct.stockQuantity} units</div>
+                 <div><span className="font-medium">Package Dimensions:</span> {selectedProduct.packageDimensions}</div>
+                 <div><span className="font-medium">Weight:</span> {selectedProduct.weight}</div>
+                 <div><span className="font-medium">Delivery Availability:</span> {selectedProduct.deliveryAvailability}</div>
+                 <div><span className="font-medium">COD Option:</span> {selectedProduct.codOption}</div>
+                 <div><span className="font-medium">Country of Origin:</span> {selectedProduct.countryOfOrigin}</div>
                </div>
              </div>
              
@@ -4496,32 +4702,37 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
                <p className="text-sm text-gray-600 font-medium">{selectedProduct.returnPolicy}</p>
              </div>
              
+             {/* Requirement: Customer Questions Section */}
+             <div className="mt-6 border-t pt-6">
+               <div className="flex justify-between items-center mb-4">
+                 <h5 className="font-bold mb-0">Customer Questions</h5>
+                 <button className="text-blue-600 text-sm font-bold hover:underline">View all questions</button>
+               </div>
+               <div className="space-y-4 mb-6">
+                 <div className="bg-gray-50 p-3 rounded">
+                   <p className="text-sm font-semibold text-gray-800">Q: Is this material 100% cotton?</p>
+                   <p className="text-sm text-gray-600 mt-1">A: Yes, it is made of 100% premium cotton.</p>
+                 </div>
+               </div>
+               <button 
+                 className="w-full py-2 border border-slate-200 text-slate-600 rounded font-bold text-sm hover:bg-slate-50 transition-colors"
+                 onClick={() => alert('Open Question Form Modal')}
+               >
+                 Ask a Question
+               </button>
+             </div>
+
              <div className="mt-6 border-t pt-6">
                <h5 className="font-bold mb-3">Customer Reviews & Ratings</h5>
                <div className="space-y-4">
                  <div className="border-b pb-4">
                    <div className="flex items-center mb-2">
                      <div className="flex text-yellow-400">
-                       {[...Array(5)].map((_, i) => (
-                         <Star key={i} size={14} fill="currentColor" />
-                       ))}
+                       {[...Array(5)].map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
                      </div>
                      <span className="text-sm text-gray-500 ml-2 font-semibold">John Doe</span>
                    </div>
                    <p className="text-sm text-gray-600 font-medium">Great product! Exactly as described and fits perfectly.</p>
-                 </div>
-                 
-                 <div className="border-b pb-4">
-                   <div className="flex items-center mb-2">
-                     <div className="flex text-yellow-400">
-                       {[...Array(4)].map((_, i) => (
-                         <Star key={i} size={14} fill="currentColor" />
-                       ))}
-                       <Star size={14} />
-                     </div>
-                     <span className="text-sm text-gray-500 ml-2 font-semibold">Jane Smith</span>
-                   </div>
-                   <p className="text-sm text-gray-600 font-medium">Good quality product. The material is soft and comfortable.</p>
                  </div>
                </div>
              </div>
@@ -4530,7 +4741,155 @@ const CategoryPage = ({ category, setCurrentPage, searchQuery, setSearchQuery })
        </div>
      )}
      
-     {/* Share Product Modal */}
+     {/* SELECTION MODAL */}
+     {selectionModalOpen && selectedProduct && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg w-full max-w-5xl max-h-[65vh] overflow-hidden shadow-2xl animate-fade-in-up flex flex-col md:flex-row h-auto md:h-[600px]">
+          
+          {/* LEFT COLUMN: Product Image */}
+          <div className="w-full md:w-1/2 h-64 md:h-full bg-gray-100 relative">
+            <img 
+              src={selectedProduct.images[0]} 
+              alt={selectedProduct.name} 
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Close Button on Image */}
+            <button 
+              onClick={() => setSelectionModalOpen(false)} 
+              className="absolute top-4 right-4 bg-white p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors z-10"
+            >
+              <X size={20} className="text-gray-800" />
+            </button>
+          </div>
+
+          {/* RIGHT COLUMN: Product Details & Selection */}
+          <div className="w-full md:w-1/2 flex flex-col h-full">
+            
+            {/* Scrollable Content Area */}
+            <div className="overflow-y-auto p-6 pb-4">
+              
+              {/* Header */}
+              <div className="mb-4">
+                <p className="text-xs font-bold text-gray-500 mb-1">{selectedProduct.brandName}</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedProduct.name}</h3>
+                
+                {/* Rating */}
+                <div className="flex items-center mb-4">
+              <div className="flex text-yellow-400">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={14} fill={i < Math.floor(selectedProduct.rating || 4) ? "currentColor" : "none"} />
+                ))}
+              </div>
+              <span className="text-xs text-gray-500 ml-1 font-semibold">({selectedProduct.reviews || 100})</span>
+            </div>
+    
+                {/* Price Block - Myntra Style */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl font-bold text-gray-900">
+                    Rs. {calculateGSTInclusivePrice(selectedProduct.price, selectedProduct.category)}
+                  </span>
+                  <span className="text-sm font-medium text-gray-300 line-through">
+                    MRP ₹{
+                      selectedProduct.discountedPrice && selectedProduct.discountedPrice > selectedProduct.price 
+                      ? calculateGSTInclusivePrice(selectedProduct.discountedPrice, selectedProduct.category)
+                      : Math.round(calculateGSTInclusivePrice(selectedProduct.price, selectedProduct.category) * 1.2)
+                    }
+                  </span>
+                  <span className="text-sm font-bold text-red-500">
+                {(() => {
+                  const sellingPrice = calculateGSTInclusivePrice(selectedProduct.price, selectedProduct.category);
+                  const mrp = selectedProduct.discountedPrice && selectedProduct.discountedPrice > selectedProduct.price 
+                    ? calculateGSTInclusivePrice(selectedProduct.discountedPrice, selectedProduct.category)
+                    : Math.round(sellingPrice * 1.2);
+                  const discountPercent = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+                  return `(${discountPercent}% OFF)`;
+                })()}
+              </span>
+                </div>
+              </div>
+
+              {/* Select Size Section */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-sm font-bold text-gray-900 tracking-wide">Select Size</p>
+                  <button className="text-sm text-blue-600 hover:underline font-bold">Size Chart</button>
+                </div>
+                
+                <div className="flex flex-wrap gap-3">
+                  {selectedProduct.sizes && selectedProduct.sizes.split(',').map((size, index) => (
+                    <button 
+                      key={index}
+                      onClick={() => setSelectedSize(size.trim())}
+                      className={`w-10 h-10 flex items-center justify-center border text-sm font-bold rounded-md transition-all duration-200 ${
+                        selectedSize === size.trim() 
+                          ? 'border-black bg-gray-900 text-white shadow-md transform scale-105' 
+                          : 'border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black'
+                      }`}
+                    >
+                      {size.trim()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Select Color Section */}
+              <div className="mb-6">
+                 <p className="text-sm font-bold text-gray-900 tracking-wide mb-3">Select Color</p>
+                 <div className="flex flex-wrap gap-3">
+                   {selectedProduct.colors && selectedProduct.colors.split(',').map((color, index) => (
+                     <button 
+                       key={index}
+                       onClick={() => setSelectedColor(color.trim())}
+                       className={`px-4 py-2 text-xs font-bold border rounded transition-all ${
+                         selectedColor === color.trim()
+                           ? 'border-black bg-gray-900 text-white shadow-md transform scale-105'
+                           : 'border-gray-300 text-gray-700 hover:border-gray-500 hover:text-black'
+                       }`}
+                     >
+                       {color.trim()}
+                     </button>
+                   ))}
+                 </div>
+              </div>
+              
+              {/* Offer Strip */}
+              {selectedProduct.offer && (
+                <div className="bg-green-50 border-green-500 p-3 mb-4">
+                  <p className="text-xs font-bold text-gray-800">
+                    <span className="text-green-600">OFFER:</span> {selectedProduct.offer}
+                  </p>
+                </div>
+              )}
+
+              {/* Delivery Info - Clean Text Style */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Seller</p>
+                  <p className="text-sm font-semibold text-gray-800">{selectedProduct.brandName || "RetailNet Official"}</p>
+                </div>
+                <div className="text-right">
+                   <p className="text-xs font-bold text-gray-400 uppercase">Delivery</p>
+                   <p className="text-sm font-semibold text-green-700">{deliveryInfo?.estimatedDays || '3-5'} Business Days</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer / Sticky Action Button */}
+            <div className="p-4 border-t border-gray-200 bg-white shrink-0">
+              <button 
+                onClick={handleSelectionDone}
+                className="w-full py-3.5 w-full mt-2 px-3 py-2 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    )}
+     
      <ShareProductModal 
        product={selectedProduct}
        isOpen={shareModalOpen}
@@ -7096,6 +7455,42 @@ const LandingPage = ({ setCurrentPage, setUserType, setIsLoggedIn, setShowAuth, 
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [deliveryPincode, setDeliveryPincode] = useState('');
+  const [deliveryInfo, setDeliveryInfo] = useState(null);
+  const [pincodeChecked, setPincodeChecked] = useState(false);
+  const [selectionModalOpen, setSelectionModalOpen] = useState(false);
+  
+
+
+   const calculateGSTInclusivePrice = (price, category) => {
+        let gstRate = 0.18; 
+        if (category === 'Clothing') {
+          gstRate = price <= 2500 ? 0.05 : 0.18;
+        }
+        return Math.round(price * (1 + gstRate));
+      };
+      
+      const calculateCredits = (price) => {
+        return (price / 100).toFixed(2);
+      };
+
+  // Add this function to handle checking delivery availability
+  const checkDeliveryAvailability = (pincode) => {
+    if (!pincode || pincode.length < 6) {
+      alert('Please enter a valid pincode');
+      return;
+    }
+  
+    // Here you would typically make an API call to check delivery availability
+    // For now, I'm just showing a mock response
+    setDeliveryInfo({
+      estimatedDays: '3-5',
+      deliveryCharge: 'FREE',
+      returnAvailable: true
+    });
+
+    setPincodeChecked(true);
+  };
   
   // Refs for dropdown handling
   const companyDropdownRef = useRef(null);
@@ -8052,7 +8447,7 @@ const LandingPage = ({ setCurrentPage, setUserType, setIsLoggedIn, setShowAuth, 
 
                 return (
                   <>
-                    <div className="flex items-center mb-4">
+                    <div className="flex items-center mb-2">
                       <span className="text-2xl font-bold">₹{inclusivePrice}</span>
                       <span className="text-sm text-gray-500 ml-2 font-semibold">({credits})</span>
                       <span className="text-sm text-gray-500 ml-2">(Inclusive of all taxes)</span>
@@ -8152,6 +8547,58 @@ const LandingPage = ({ setCurrentPage, setUserType, setIsLoggedIn, setShowAuth, 
               >
                 <span className="text-sm font-bold">Add to cart</span>
               </button>
+            </div>
+
+            {/* Delivery Pincode Section */}
+                       <div className="mt-4 p-3 border border-gray-300 rounded">
+                        <p className="text-sm font-bold mb-2">Delivery Pincode:</p>
+                         <div className="flex items-center">
+                          <input 
+                            type="text" 
+                            placeholder="Enter a Pincode" 
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-semibold focus:outline-none focus:border-green-500"
+                            onChange={(e) => setDeliveryPincode(e.target.value)}
+                            value={deliveryPincode || ''}
+                            disabled={pincodeChecked}
+                          />
+                        <button 
+                          className={`ml-2 px-2.5 py-1 rounded text-sm font-semibold transition-all duration-200 transform hover:scale-105 ${pincodeChecked 
+                           ? 'bg-slate-700 hover:bg-slate-700 text-white' 
+                           : 'bg-slate-700 hover:bg-slate-700 text-white'}`}
+                          onClick={() => {
+                        if (pincodeChecked) {
+                         // If pincode was already checked, allow changing it
+                         setPincodeChecked(false);
+                         setDeliveryInfo(null);
+                         // Clear the pincode to allow user to enter a new one
+                          setDeliveryPincode('');
+                          } else {
+                          // Check the pincode
+                          checkDeliveryAvailability(deliveryPincode);
+                         }
+                        }}
+                       >
+                         {pincodeChecked ? 'Change' : 'Check'}
+                     </button>
+                    </div>
+            {deliveryInfo && (
+              <div className="mt-3 text-sm">
+                <p className="text-green-600 font-medium mb-1">
+                <span className="font-bold">Estimation:</span> {deliveryInfo.estimatedDays || '3-5'} business days
+                </p>
+                <p className="text-gray-600 font-medium mb-1">
+                <span className="font-bold">Delivery charge:</span> {deliveryInfo.deliveryCharge || 'FREE'}
+                </p>
+                <p className="text-gray-600 font-medium mb-2">
+                 <span className="font-bold">Return and Exchange:</span> Available
+                 </p>
+                  <div className="bg-blue-50 p-2 rounded mt-2">
+                 <p className="text-xs font-semibold text-blue-700">
+                  Return a product and get the amount back as credits! Use them anytime for your next purchase and no expiry, no rush.
+                 </p>
+                 </div>
+              </div>
+               )}
             </div>
           </div>
         </div>
