@@ -4,6 +4,9 @@ import { Wallet, TrendingUp, Award, MoreVertical, Shield, Instagram,
   MessageSquare, Search, User, ChevronDown, ChevronUp, ChevronRight, Check,
   LogOut, Copy, X, Menu, Plus, Edit, Trash2, Upload, XCircle,
   Star} from 'lucide-react';
+
+  import CreateInvoice from './CreateInvoice';
+  import CouponManagement from './CouponManagement';
   
 // Mock Firebase auth functions
 const mockAuth = {
@@ -5889,6 +5892,7 @@ function BrandOwnerDashboard({ user, onLogout }) {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [kycData, setKycData] = useState({
     pan: '',
     aadhaar: '',
@@ -6951,6 +6955,20 @@ function BrandOwnerDashboard({ user, onLogout }) {
                   <div className="text-lg font-semibold">KYC Verification</div>
                   <div className="text-sm opacity-90 mt-1">Complete your verification</div>
                 </button>
+                <button
+                 onClick={() => setShowInvoiceModal(true)}
+                 className="p-4 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-lg hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md"
+                >
+                 <div className="text-lg font-semibold">Create Invoice</div>
+                 <div className="text-sm opacity-90 mt-1">Generate customer invoices</div>
+                 </button>
+                <button
+                onClick={() => setActiveTab('coupons')}
+                className="p-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg hover:from-pink-600 hover:to-pink-700 transition-all shadow-md"
+                >
+                 <div className="text-lg font-semibold">Manage Coupons</div>
+                 <div className="text-sm opacity-90 mt-1">Create and manage discount coupons</div>
+             </button>
            </div>
           </div>
         );
@@ -11404,6 +11422,9 @@ function BrandOwnerDashboard({ user, onLogout }) {
           </div>
         );
         
+      case 'coupons':
+      return <CouponManagement user={user} />;
+
       default:
         return null;
     }
@@ -11592,6 +11613,28 @@ function BrandOwnerDashboard({ user, onLogout }) {
               >
                 Add Bank Account
               </button>
+              <button
+                onClick={() => {
+                  setShowInvoiceModal(true);
+                  setIsMenuOpen(false);
+               }}
+               className={`w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100`}
+              >
+                Create Invoice
+              </button>
+              <button
+              onClick={() => {
+    setActiveTab('coupons');
+    setIsMenuOpen(false);
+  }}
+  className={`w-full text-left px-4 py-2 text-sm font-medium ${
+    activeTab === 'coupons' 
+      ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-700' 
+      : 'text-gray-700 hover:bg-gray-100'
+  }`}
+>
+  Manage Coupons
+</button>
             </div>
           </div>
         </div>
@@ -11700,6 +11743,15 @@ function BrandOwnerDashboard({ user, onLogout }) {
       
       {/* Footer */}
       <Footer />
+
+      {/* Create Invoice Modal */}
+      {showInvoiceModal && (
+       <CreateInvoice
+          user={user}
+          products={products}
+          onClose={() => setShowInvoiceModal(false)}
+       />
+)}
     </div>
   );
 }

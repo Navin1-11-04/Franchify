@@ -5,6 +5,8 @@ import PortalView from "./pages/Signup";
 import InventoryDashboard from "./pages/InventoryDashboard"; 
 // Import the new Admin Dashboard component
 import AdminDashboard from "./pages/AdminDashboard"; 
+import AdminCouponDashboard from "./pages/AdminCouponDashboard";
+import AdminInvoiceDashboard from "./pages/Admininvoicedashboard";
 
 export default function App() {
   return (
@@ -17,7 +19,8 @@ export default function App() {
         <Route path="/portal/:portalUrl" element={<PortalView />} />
         <Route path="/inventory" element={<InventoryDashboard />} />
         <Route path="/dashboard/inventory" element={<InventoryDashboard />} />
-        
+        <Route path="/adminCoupons" element={<AdminCouponDashboard />} />
+        <Route path="/adminInvoices" element={<AdminInvoiceDashboard />} />
         {/* --- Admin Dashboard Routes --- */}
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
