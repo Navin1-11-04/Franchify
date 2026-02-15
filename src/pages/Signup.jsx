@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Wallet, TrendingUp, Award, MoreVertical, Shield, Instagram,
+import { Wallet, Store, TrendingUp, Award, MoreVertical, Shield, Instagram,
   Lock,Package, Tag, Coins, Trophy, Settings, CheckCircle, AlertTriangle,
   MessageSquare, Search, User, ChevronDown, ChevronUp, ChevronRight, Check,
   LogOut, Copy, X, Menu, Plus, Edit, Trash2, Upload, XCircle,
@@ -7,6 +7,7 @@ import { Wallet, TrendingUp, Award, MoreVertical, Shield, Instagram,
 
   import CreateInvoice from './CreateInvoice';
   import CouponManagement from './CouponManagement';
+  import ManageBusiness from './ManageBusiness';
   
 // Mock Firebase auth functions
 const mockAuth = {
@@ -6033,6 +6034,21 @@ function BrandOwnerDashboard({ user, onLogout }) {
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState(null);
+
+    // 1. State to toggle the "Add New" input visibility
+  const [isAddingNewSubCategory, setIsAddingNewSubCategory] = useState(false);
+
+  // 2. State to hold the text the user types in the new input
+  const [newSubCategoryInput, setNewSubCategoryInput] = useState('');
+
+  // 3. State to store custom sub-categories created by the user
+  // Structure: { "Men's Clothing": ["Custom Jeans", "Vintage Hoodies"], ... }
+  const [customSubCategories, setCustomSubCategories] = useState({});
+  
+    // --- New State Variables for Category Logic ---
+  const [customCategories, setCustomCategories] = useState([]); // Stores user-created categories
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false); // Toggles the category input field
+  const [newCategoryName, setNewCategoryName] = useState(''); // Holds the text for the new category
   
   const companyDropdownRef = React.useRef(null);
   
@@ -6500,6 +6516,71 @@ function BrandOwnerDashboard({ user, onLogout }) {
     setActiveTab('products');
   };
 
+  const handleAddNewSubCategory = () => {
+    const categoryName = productForm.category;
+    const newSub = newSubCategoryInput.trim();
+
+    // Validation
+    if (!categoryName) {
+      alert("Please select a Category first.");
+      return;
+    }
+    if (!newSub) {
+      alert("Please enter a sub-category name.");
+      return;
+    }
+
+    // Update Custom Sub-Categories State
+    setCustomSubCategories((prev) => {
+      const existingSubs = prev[categoryName] || [];
+      
+      // Prevent duplicates
+      if (existingSubs.includes(newSub)) {
+        alert("This sub-category already exists.");
+        return prev;
+      }
+      
+      // *** DATABASE SAVE ACTION ***
+      // TODO: Call your API here to save { category: categoryName, subCategory: newSub }
+      // e.g., await api.saveSubCategory(categoryName, newSub);
+      
+      return {
+        ...prev,
+        [categoryName]: [...existingSubs, newSub],
+      };
+    });
+
+    // Automatically select the newly created sub-category in the form
+    setProductForm({
+      ...productForm,
+      subCategory: newSub,
+    });
+
+    // Reset input and hide the field
+    setNewSubCategoryInput('');
+    setIsAddingNewSubCategory(false);
+  };
+  
+  // Function to handle saving a new custom category
+  const handleAddNewCategory = () => {
+    if (newCategoryName && newCategoryName.trim()) {
+      const trimmedName = newCategoryName.trim();
+      
+      // 1. Add to local custom categories state
+      setCustomCategories([...customCategories, trimmedName]);
+      
+      // 2. Automatically select this new category in the form
+      setProductForm({ ...productForm, category: trimmedName });
+      
+      // 3. Reset input and hide field
+      setNewCategoryName('');
+      setShowNewCategoryInput(false);
+
+      // 4. API CALL: Here you would typically call your backend to save this category permanently
+      // Example: api.saveNewCategory({ name: trimmedName, type: 'accessory' });
+    }
+  };
+
   const resetAccessoryForm = () => {
     setAccessoryForm({
       name: '',
@@ -6956,6 +7037,13 @@ function BrandOwnerDashboard({ user, onLogout }) {
                   <div className="text-sm opacity-90 mt-1">Complete your verification</div>
                 </button>
                 <button
+                  onClick={() => setActiveTab('bank')}
+                  className="p-4 bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded-lg hover:from-blue-600 hover:to-teal-600 transition-all shadow-md"
+              >
+                  <div className="text-lg font-semibold">Bank Account Verification</div>
+                  <div className="text-sm opacity-90 mt-1">Verify your bank details</div>
+                </button>
+                <button
                  onClick={() => setShowInvoiceModal(true)}
                  className="p-4 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-lg hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md"
                 >
@@ -6969,6 +7057,18 @@ function BrandOwnerDashboard({ user, onLogout }) {
                  <div className="text-lg font-semibold">Manage Coupons</div>
                  <div className="text-sm opacity-90 mt-1">Create and manage discount coupons</div>
              </button>
+             <button
+  onClick={() => setActiveTab('manageBusiness')}
+  className="p-4 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg hover:from-teal-600 hover:to-teal-700 transition-all shadow-md"
+>
+  <div className="flex items-center">
+    <Store size={24} className="mr-3" />
+    <div className="text-left">
+      <div className="font-semibold">Manage Business</div>
+      <div className="text-sm opacity-90">Complete business management</div>
+    </div>
+  </div>
+</button>
            </div>
           </div>
         );
@@ -8935,21 +9035,83 @@ function BrandOwnerDashboard({ user, onLogout }) {
           <option value="Western Wear">Western Wear</option>
         </select>
       </div>
-      <div>
+      
+      {/* --- UPDATED SUB-CATEGORY SECTION --- */}
+      <div className="md:col-span-2">
         <label className="block text-sm font-medium text-gray-700 mb-2">Sub-Category *</label>
-        <select 
-          value={productForm.subCategory}
-          onChange={(e) => setProductForm({...productForm, subCategory: e.target.value})}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-          disabled={!productForm.category}
-        >
-          <option value="">{productForm.category ? "Select Sub-Category" : "Select Category First"}</option>
-          {productForm.category && categorySubCategories[productForm.category]?.map((sub) => (
-            <option key={sub} value={sub}>{sub}</option>
-          ))}
-        </select>
+        
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+          {/* Combined Dropdown (Predefined + Custom) */}
+          <div className="md:col-span-8">
+            <select 
+              value={productForm.subCategory}
+              onChange={(e) => setProductForm({...productForm, subCategory: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              disabled={!productForm.category}
+            >
+              <option value="">{productForm.category ? "Select Sub-Category" : "Select Category First"}</option>
+              {productForm.category && [
+                ...(categorySubCategories[productForm.category] || []),
+                ...(customSubCategories[productForm.category] || [])
+              ].map((sub, index) => (
+                <option key={`${sub}-${index}`} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Add New Button */}
+          <div className="md:col-span-4 flex items-end">
+            <button
+              type="button"
+              onClick={() => {
+                if(!productForm.category) {
+                  alert("Please select a Category first.");
+                  return;
+                }
+                setIsAddingNewSubCategory(!isAddingNewSubCategory);
+              }}
+              disabled={!productForm.category}
+              className="w-full px-3 py-2 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center"
+            >
+              {isAddingNewSubCategory ? 'Cancel' : '+ Add New Sub-category'}
+            </button>
+          </div>
+        </div>
+
+        {/* Conditional Input Field for New Sub-category */}
+        {isAddingNewSubCategory && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200 flex items-center space-x-2">
+            <input
+              type="text"
+              value={newSubCategoryInput}
+              onChange={(e) => setNewSubCategoryInput(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              placeholder="Type new sub-category name..."
+              onKeyDown={(e) => e.key === 'Enter' && handleAddNewSubCategory()}
+            />
+            <button
+              type="button"
+              onClick={handleAddNewSubCategory}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddingNewSubCategory(false);
+                setNewSubCategoryInput('');
+              }}
+              className="px-3 py-2 text-gray-600 hover:text-gray-800 text-sm"
+            >
+              Discard
+            </button>
+          </div>
+        )}
       </div>
+      {/* --- END UPDATED SECTION --- */}
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Product MRP (₹) *</label>
         <input 
@@ -9770,8 +9932,8 @@ function BrandOwnerDashboard({ user, onLogout }) {
   </div>
             </form>
           </div>
-        );
-        
+        ); 
+      
       case 'kyc':
         return (
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -10106,25 +10268,25 @@ function BrandOwnerDashboard({ user, onLogout }) {
   );
 
       case 'addaccessory':
-        return (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">
-                {editingProduct ? 'Edit Accessory' : 'Add New Accessory'}
-              </h2>
-              <button
-                onClick={() => {
-                  resetProductForm();
-                  setActiveTab('products');
-                }}
-                className="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-              >
-                <X size={20} className="mr-2" />
-                Cancel
-              </button>
-            </div>
-            
-            <form onSubmit={handleProductSubmit} className="space-y-6">
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">
+          {editingProduct ? 'Edit Accessory' : 'Add New Accessory'}
+        </h2>
+        <button
+          onClick={() => {
+            resetProductForm();
+            setActiveTab('products');
+          }}
+          className="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+        >
+          <X size={20} className="mr-2" />
+          Cancel
+        </button>
+      </div>
+      
+      <form onSubmit={handleProductSubmit} className="space-y-6">
         {/* Basic Information Section */}
         <div className="border-b pb-4">
           <h4 className="text-md font-medium text-gray-900 mb-3">Basic Information</h4>
@@ -10151,28 +10313,84 @@ function BrandOwnerDashboard({ user, onLogout }) {
                 required
               />
             </div>
-            <div>
+            
+            {/* --- UPDATED CATEGORY SECTION (With Custom Logic) --- */}
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
-              <select 
-                value={productForm.category}
-                onChange={(e) => setProductForm({...productForm, category: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Select Category</option>
-                <option value="Bags">Bags</option>
-                <option value="Belts">Belts</option>
-                <option value="Hats">Hats</option>
-                <option value="Scarves">Scarves</option>
-                <option value="Gloves">Gloves</option>
-                <option value="Jewelry">Jewelry</option>
-                <option value="Sunglasses">Sunglasses</option>
-                <option value="Watches">Watches</option>
-                <option value="Wallets">Wallets</option>
-                <option value="Ties">Ties</option>
-                <option value="Other">Other</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <select 
+                  value={productForm.category}
+                  onChange={(e) => setProductForm({...productForm, category: e.target.value})}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select Category</option>
+                  
+                  <optgroup label="Predefined Categories">
+                    <option value="Bags">Bags</option>
+                    <option value="Belts">Belts</option>
+                    <option value="Hats">Hats</option>
+                    <option value="Scarves">Scarves</option>
+                    <option value="Gloves">Gloves</option>
+                    <option value="Jewelry">Jewelry</option>
+                    <option value="Sunglasses">Sunglasses</option>
+                    <option value="Watches">Watches</option>
+                    <option value="Wallets">Wallets</option>
+                    <option value="Ties">Ties</option>
+                    <option value="Other">Other</option>
+                  </optgroup>
+
+                  {customCategories.length > 0 && (
+                    <optgroup label="Your Categories">
+                      {customCategories.map((cat, index) => (
+                        <option key={index} value={cat}>{cat}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+
+                <button 
+                  type="button"
+                  onClick={() => setShowNewCategoryInput(!showNewCategoryInput)}
+                  className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 flex items-center"
+                  title="Create new category"
+                >
+                  <Plus size={18} />
+                  <span className="ml-1 hidden sm:inline">New</span>
+                </button>
+              </div>
+
+              {showNewCategoryInput && (
+                <div className="mt-3 flex items-center gap-2 p-3 bg-gray-50 rounded-md border border-gray-200">
+                  <input 
+                    type="text" 
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter new category name"
+                  />
+                  <button 
+                    type="button"
+                    onClick={handleAddNewCategory}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    Save
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowNewCategoryInput(false);
+                      setNewCategoryName('');
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
+            
+            {/* --- REVERTED SUB-CATEGORY SECTION (No Button) --- */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Sub-Category</label>
               <input 
@@ -10183,6 +10401,7 @@ function BrandOwnerDashboard({ user, onLogout }) {
                 placeholder="e.g., Handbags, Belts, Sunglasses"
               />
             </div>
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Model/Style Code</label>
               <input 
@@ -10257,7 +10476,6 @@ function BrandOwnerDashboard({ user, onLogout }) {
               />
             </div>
             
-            {/* Color Availability - Updated for SKU Generation */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Available Colors *</label>
               <div className="flex items-center space-x-2 mb-2">
@@ -10445,7 +10663,7 @@ function BrandOwnerDashboard({ user, onLogout }) {
           </div>
         </div>
         
-        {/* Size & Dimensions Section - Updated for SKU Generation */}
+        {/* Size & Dimensions Section */}
         <div className="border-b pb-4">
           <h4 className="text-md font-medium text-gray-900 mb-3">Size & Dimensions</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -10486,7 +10704,6 @@ function BrandOwnerDashboard({ user, onLogout }) {
               </select>
             </div>
             
-            {/* Size Options - Updated for SKU Generation */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Size Options *</label>
               <div className="flex items-center space-x-2 mb-2">
@@ -10538,14 +10755,12 @@ function BrandOwnerDashboard({ user, onLogout }) {
           </div>
         </div>
         
-        {/* SKU Code Generation Section - New Addition */}
+        {/* SKU Code Generation Section */}
         <div className="border-b pb-4">
           <h4 className="text-md font-medium text-gray-900 mb-3">SKU Code Generation</h4>
-          {/* Generate SKU Codes Button */}
           <button 
             type="button"
             onClick={() => {
-              // Generate SKU codes based on size and color combinations
               if (productForm.sizes && productForm.colors) {
                 const sizes = productForm.sizes.split(', ');
                 const colors = productForm.colors.split(', ');
@@ -10577,35 +10792,22 @@ function BrandOwnerDashboard({ user, onLogout }) {
             Generate SKU Codes
           </button>
           
-          {/* Display SKU Codes Table */}
           {productForm.skuCodes && productForm.skuCodes.length > 0 && (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Size
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Color
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      SKU Code
-                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU Code</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {productForm.skuCodes.map((sku, index) => (
                     <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {sku.size}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {sku.color}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {sku.sku}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.size}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.color}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.sku}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -11132,9 +11334,9 @@ function BrandOwnerDashboard({ user, onLogout }) {
           </button>
         </div>
       </form>
-          </div>
-        ); 
-        
+    </div>
+  ); 
+      
       case 'team':
         return (
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -11424,7 +11626,18 @@ function BrandOwnerDashboard({ user, onLogout }) {
         
       case 'coupons':
       return <CouponManagement user={user} />;
-
+      
+      case 'manageBusiness':
+  return (
+    <ManageBusiness 
+      user={user}
+      products={products}
+      setProducts={setProducts}
+      accessories={accessories}
+      setAccessories={setAccessories}
+    />
+  );
+     
       default:
         return null;
     }
@@ -11509,6 +11722,19 @@ function BrandOwnerDashboard({ user, onLogout }) {
               >
                 Dashboard
               </button>
+              <button
+  onClick={() => {
+    setActiveTab('manageBusiness');
+    setIsMenuOpen(false);
+  }}
+  className={`w-full text-left px-4 py-2 text-sm font-medium ${
+    activeTab === 'manageBusiness'
+      ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-700'
+      : 'text-gray-700 hover:bg-gray-100'
+  }`}
+>
+  Manage Business
+</button>
               <button
                 onClick={() => {
                   setActiveTab('team');
@@ -11618,23 +11844,27 @@ function BrandOwnerDashboard({ user, onLogout }) {
                   setShowInvoiceModal(true);
                   setIsMenuOpen(false);
                }}
-               className={`w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100`}
+               className={`w-full text-left px-4 py-2 text-sm font-medium ${
+                  activeTab === 'invoice' 
+                    ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-700' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
               >
                 Create Invoice
               </button>
               <button
               onClick={() => {
-    setActiveTab('coupons');
-    setIsMenuOpen(false);
-  }}
-  className={`w-full text-left px-4 py-2 text-sm font-medium ${
-    activeTab === 'coupons' 
-      ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-700' 
-      : 'text-gray-700 hover:bg-gray-100'
-  }`}
->
-  Manage Coupons
-</button>
+              setActiveTab('coupons');
+              setIsMenuOpen(false);
+               }}
+                  className={`w-full text-left px-4 py-2 text-sm font-medium ${
+                  activeTab === 'coupons' 
+                   ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-700' 
+                   : 'text-gray-700 hover:bg-gray-100'
+                 }`}
+              >
+               Manage Coupons
+             </button>
             </div>
           </div>
         </div>
