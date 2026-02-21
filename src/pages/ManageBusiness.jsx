@@ -131,7 +131,84 @@ const ManageBusiness = ({ user, products, setProducts, accessories, setAccessori
     loadBusinessData();
     calculateLowStockAlerts();
     calculateFinancialData();
+    generateSampleAbandonedCarts(); // Generate sample data if none exists
   }, [products, accessories]);
+
+  // Generate sample abandoned carts if none exist
+  const generateSampleAbandonedCarts = () => {
+    const savedCarts = localStorage.getItem(`abandonedCarts_${user.userId}`);
+    if (!savedCarts || JSON.parse(savedCarts).length === 0) {
+      // Create sample abandoned carts
+      const sampleCarts = [
+        {
+          id: 'AC001',
+          customerName: 'Rajesh Kumar',
+          email: 'rajesh.kumar@example.com',
+          phone: '919876543210',
+          itemCount: 3,
+          cartValue: 2499,
+          lastUpdated: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+          timeAgo: '2 hours ago',
+          items: ['Blue Cotton Shirt', 'Denim Jeans', 'Leather Belt']
+        },
+        {
+          id: 'AC002',
+          customerName: 'Priya Sharma',
+          email: 'priya.sharma@example.com',
+          phone: '919876543211',
+          itemCount: 1,
+          cartValue: 1299,
+          lastUpdated: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+          timeAgo: '5 hours ago',
+          items: ['Red Handbag']
+        },
+        {
+          id: 'AC003',
+          customerName: 'Amit Patel',
+          email: 'amit.patel@example.com',
+          phone: '919876543212',
+          itemCount: 2,
+          cartValue: 3599,
+          lastUpdated: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+          timeAgo: '1 day ago',
+          items: ['Formal Suit', 'Tie']
+        },
+        {
+          id: 'AC004',
+          customerName: 'Sneha Reddy',
+          email: null,
+          phone: '919876543213',
+          itemCount: 4,
+          cartValue: 4999,
+          lastUpdated: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
+          timeAgo: '3 hours ago',
+          items: ['Evening Dress', 'Heels', 'Clutch', 'Earrings']
+        }
+      ];
+      setAbandonedCarts(sampleCarts);
+      localStorage.setItem(`abandonedCarts_${user.userId}`, JSON.stringify(sampleCarts));
+    } else {
+      setAbandonedCarts(JSON.parse(savedCarts));
+    }
+  };
+
+  // Calculate time ago for abandoned carts
+  const calculateTimeAgo = (timestamp) => {
+    const now = new Date();
+    const past = new Date(timestamp);
+    const diffMs = now - past;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) {
+      return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    } else {
+      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+    }
+  };
 
   // Load business data from localStorage
   const loadBusinessData = () => {
@@ -503,7 +580,8 @@ const ManageBusiness = ({ user, products, setProducts, accessories, setAccessori
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Business Overview</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-md p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -545,6 +623,19 @@ const ManageBusiness = ({ user, products, setProducts, accessories, setAccessori
             <AlertTriangle size={40} className="opacity-80" />
           </div>
         </div>
+
+        <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg shadow-md p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-yellow-100 text-sm">Abandoned Carts</p>
+              <p className="text-3xl font-bold mt-2">{abandonedCarts.length}</p>
+              <p className="text-yellow-100 text-xs mt-1">
+                ₹{abandonedCarts.reduce((sum, cart) => sum + cart.cartValue, 0).toFixed(0)} potential
+              </p>
+            </div>
+            <ShoppingCart size={40} className="opacity-80" />
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -565,34 +656,112 @@ const ManageBusiness = ({ user, products, setProducts, accessories, setAccessori
         </div>
       </div>
 
-      {lowStockAlerts.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
+      {/* Alerts Section - Low Stock and Abandoned Carts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Low Stock Alerts 
+            <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold text-red-600">Low Stock Alerts</h3>
             <AlertTriangle className="text-red-600" size={24} />
           </div>
-          <div className="space-y-2">
-            {lowStockAlerts.slice(0, 5).map(item => (
-              <div key={item.id} className="flex items-center justify-between p-3 bg-red-50 rounded">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-gray-600">Stock: {item.stockQuantity || 0}</p>
+          {lowStockAlerts.length > 0 ? (
+            <div className="space-y-2">
+              {lowStockAlerts.slice(0, 5).map(item => (
+                <div key={item.id} className="flex items-center justify-between p-3 bg-red-50 rounded">
+                  <div>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm text-gray-600">Stock: {item.stockQuantity || 0}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedProduct(item);
+                      setStockOperation('in');
+                      setShowStockModal(true);
+                    }}
+                    className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                  >
+                    Add Stock
+                  </button>
                 </div>
+              ))}
+              {lowStockAlerts.length > 5 && (
+                <button
+                  onClick={() => setActiveSection('products')}
+                  className="w-full text-center text-sm text-blue-600 hover:text-blue-800 mt-2"
+                >
+                  View all {lowStockAlerts.length} alerts →
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Check className="mx-auto text-green-500 mb-2" size={40} />
+              <p className="text-gray-500">All products have sufficient stock</p>
+            </div>
+          )}
+        </div>*/}
+        
+
+        {/* <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-orange-600">Abandoned Carts</h3>
+            <ShoppingCart className="text-orange-600" size={24} />
+          </div>
+          {abandonedCarts.length > 0 ? (
+            <div className="space-y-2">
+              {abandonedCarts.slice(0, 5).map(cart => (
+                <div key={cart.id} className="flex items-center justify-between p-3 bg-orange-50 rounded">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-medium">{cart.customerName || 'Guest User'}</p>
+                      <span className="text-xs text-gray-500">
+                        {cart.timeAgo || new Date(cart.lastUpdated).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {cart.itemCount} {cart.itemCount === 1 ? 'item' : 'items'} • ₹{cart.cartValue}
+                    </p>
+                    {cart.email && (
+                      <p className="text-xs text-gray-500 mt-1">{cart.email}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Open email/WhatsApp to contact customer
+                      if (cart.email) {
+                        window.location.href = `mailto:${cart.email}?subject=Complete your purchase&body=Hi ${cart.customerName}, we noticed you left items in your cart. Complete your purchase now!`;
+                      } else if (cart.phone) {
+                        window.open(`https://wa.me/${cart.phone}?text=Hi ${cart.customerName}, we noticed you left items in your cart. Complete your purchase now!`, '_blank');
+                      }
+                    }}
+                    className="ml-3 px-3 py-1 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 whitespace-nowrap"
+                  >
+                    Follow Up
+                  </button>
+                </div>
+              ))}
+              {abandonedCarts.length > 5 && (
                 <button
                   onClick={() => {
-                    setSelectedProduct(item);
-                    setStockOperation('in');
-                    setShowStockModal(true);
+                    // Navigate to abandoned carts section (you can add this as a separate tab if needed)
+                    alert('Full abandoned carts view coming soon!');
                   }}
-                  className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                  className="w-full text-center text-sm text-blue-600 hover:text-blue-800 mt-2"
                 >
-                  Add Stock
+                  View all {abandonedCarts.length} abandoned carts →
                 </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Check className="mx-auto text-green-500 mb-2" size={40} />
+              <p className="text-gray-500">No abandoned carts</p>
+              <p className="text-xs text-gray-400 mt-1">All customers completed their purchases!</p>
+            </div>
+          )}
+        </div> Abandoned Carts */}
+        
+      </div>
     </div>
   );
 
@@ -759,6 +928,192 @@ const ManageBusiness = ({ user, products, setProducts, accessories, setAccessori
       </div>
     );
   };
+
+  // Render Abandoned Carts Section
+  const renderAbandonedCarts = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Abandoned Carts</h2>
+        <button
+          onClick={() => {
+            // Refresh abandoned carts data
+            const savedCarts = localStorage.getItem(`abandonedCarts_${user.userId}`);
+            if (savedCarts) {
+              setAbandonedCarts(JSON.parse(savedCarts));
+            }
+          }}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+        >
+          <RefreshCw size={16} className="mr-2" />
+          Refresh
+        </button>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <p className="text-sm text-gray-600">Total Abandoned</p>
+          <p className="text-2xl font-bold text-gray-900">{abandonedCarts.length}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <p className="text-sm text-gray-600">Potential Revenue</p>
+          <p className="text-2xl font-bold text-orange-600">
+            ₹{abandonedCarts.reduce((sum, cart) => sum + cart.cartValue, 0).toFixed(0)}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <p className="text-sm text-gray-600">Avg Cart Value</p>
+          <p className="text-2xl font-bold text-purple-600">
+            ₹{abandonedCarts.length > 0 ? (abandonedCarts.reduce((sum, cart) => sum + cart.cartValue, 0) / abandonedCarts.length).toFixed(0) : 0}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <p className="text-sm text-gray-600">Total Items</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {abandonedCarts.reduce((sum, cart) => sum + cart.itemCount, 0)}
+          </p>
+        </div>
+      </div>
+
+      {/* Abandoned Carts List */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {abandonedCarts.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cart Value</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {abandonedCarts.map(cart => (
+                  <tr key={cart.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+                          <Users size={20} className="text-orange-600" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{cart.customerName || 'Guest'}</div>
+                          <div className="text-xs text-gray-500">ID: {cart.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {cart.email && (
+                          <div className="flex items-center mb-1">
+                            <Mail size={12} className="mr-1 text-gray-400" />
+                            {cart.email}
+                          </div>
+                        )}
+                        {cart.phone && (
+                          <div className="flex items-center">
+                            <Phone size={12} className="mr-1 text-gray-400" />
+                            {cart.phone}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{cart.itemCount} items</div>
+                      {cart.items && cart.items.length > 0 && (
+                        <div className="text-xs text-gray-500">
+                          {cart.items[0]}{cart.items.length > 1 ? `, +${cart.items.length - 1} more` : ''}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">₹{cart.cartValue}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{cart.timeAgo || calculateTimeAgo(cart.lastUpdated)}</div>
+                      <div className="text-xs text-gray-500">{new Date(cart.lastUpdated).toLocaleString()}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        {cart.email && (
+                          <button
+                            onClick={() => {
+                              window.location.href = `mailto:${cart.email}?subject=Complete your purchase - ${cart.itemCount} items waiting&body=Hi ${cart.customerName},\n\nWe noticed you left ${cart.itemCount} items in your cart worth ₹${cart.cartValue}.\n\nComplete your purchase now and enjoy:\n- Fast delivery\n- Secure payment\n- Easy returns\n\nItems in your cart:\n${cart.items ? cart.items.map((item, i) => `${i + 1}. ${item}`).join('\n') : ''}\n\nBest regards,\n${storeDetails.storeName || 'Your Store'}`;
+                            }}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Send Email"
+                          >
+                            <Mail size={16} />
+                          </button>
+                        )}
+                        {cart.phone && (
+                          <button
+                            onClick={() => {
+                              const message = `Hi ${cart.customerName}, we noticed you left ${cart.itemCount} items in your cart worth ₹${cart.cartValue}. Complete your purchase now! ${cart.items ? cart.items.join(', ') : ''}`;
+                              window.open(`https://wa.me/${cart.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+                            }}
+                            className="text-green-600 hover:text-green-900"
+                            title="Send WhatsApp"
+                          >
+                            <MessageCircle size={16} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove this abandoned cart from ${cart.customerName}?`)) {
+                              const updatedCarts = abandonedCarts.filter(c => c.id !== cart.id);
+                              setAbandonedCarts(updatedCarts);
+                              localStorage.setItem(`abandonedCarts_${user.userId}`, JSON.stringify(updatedCarts));
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                          title="Remove"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <ShoppingCart size={48} className="mx-auto text-gray-400 mb-4" />
+            <p className="text-gray-500 mb-2">No abandoned carts</p>
+            <p className="text-sm text-gray-400">All customers completed their purchases!</p>
+          </div>
+        )}
+      </div>
+
+      {/* Recovery Tips */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-blue-900 mb-3">💡 Cart Recovery Tips</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h4 className="font-medium text-blue-800 mb-2">Follow-up Timeline:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Within 1 hour: Send immediate reminder</li>
+              <li>• After 24 hours: Offer limited-time discount</li>
+              <li>• After 3 days: Last chance reminder</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-blue-800 mb-2">Best Practices:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Personalize your message</li>
+              <li>• Highlight product benefits</li>
+              <li>• Create urgency with limited stock</li>
+              <li>• Offer incentives (discount/free shipping)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Render Invoices Section
   const renderInvoices = () => (
@@ -2023,6 +2378,7 @@ const ManageBusiness = ({ user, products, setProducts, accessories, setAccessori
               { id: 'overview', label: 'Overview', icon: BarChart2 },
               { id: 'products', label: 'Products & Accessories', icon: Package },
               { id: 'orders', label: 'Orders', icon: ShoppingCart },
+              { id: 'abandonedCarts', label: 'Abandoned Carts', icon: Archive },
               { id: 'invoices', label: 'Invoices', icon: FileText },
               { id: 'coupons', label: 'Coupons', icon: Tag },
               { id: 'categories', label: 'Categories', icon: Layers },
@@ -2052,6 +2408,7 @@ const ManageBusiness = ({ user, products, setProducts, accessories, setAccessori
         {activeSection === 'overview' && renderOverview()}
         {activeSection === 'products' && renderProductsAccessories()}
         {activeSection === 'orders' && renderOrders()}
+        {activeSection === 'abandonedCarts' && renderAbandonedCarts()}
         {activeSection === 'invoices' && renderInvoices()}
         {activeSection === 'coupons' && renderCoupons()}
         {activeSection === 'categories' && renderCategories()}
