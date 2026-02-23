@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef,useContext } from 'react';
 import { 
   Menu, X, ChevronDown, ChevronUp, Search, Heart, Plus,
-  Star, Share2, Play, User, Upload, CheckCircle,
+  Star, Share2, Play, User, Upload, CheckCircle,QrCode,
   Instagram, Youtube, Linkedin, Twitter, Trash2,
   Eye, ShoppingCart, Copy, Check, Minus, Plus as PlusIcon,
   Package, CreditCard, MapPin, Calendar, Download,
@@ -2388,7 +2388,7 @@ const ShoppingCartPage = ({ setCurrentPage }) => {
   );
 };
 
-// Checkout Page Component
+// Updated CheckoutPage Component with fixed options in Other Services tab
 const CheckoutPage = ({ setCurrentPage }) => {
   const { 
     cartItems, 
@@ -2402,17 +2402,13 @@ const CheckoutPage = ({ setCurrentPage }) => {
   
   // Function to calculate GST-inclusive price
   const calculateGSTInclusivePrice = (price, category) => {
-    // Get GST rate based on price and category
-    let gstRate = 0.18; // Default 18%
+    let gstRate = 0.18;
     if (category === 'Clothing') {
       gstRate = price <= 2500 ? 0.05 : 0.18;
     }
-    
-    // Calculate GST-inclusive price
     return Math.round(price * (1 + gstRate));
   };
   
-  // Function to calculate GST-inclusive total for cart
   const calculateGSTInclusiveTotal = () => {
     return cartItems.reduce((total, item) => {
       const inclusivePrice = calculateGSTInclusivePrice(item.price, item.category);
@@ -2420,7 +2416,6 @@ const CheckoutPage = ({ setCurrentPage }) => {
     }, 0);
   };
   
-  // Function to calculate GST-inclusive original total
   const calculateGSTInclusiveOriginalTotal = () => {
     return cartItems.reduce((total, item) => {
       const inclusiveOriginalPrice = calculateGSTInclusivePrice(item.originalPrice, item.category);
@@ -2428,7 +2423,6 @@ const CheckoutPage = ({ setCurrentPage }) => {
     }, 0);
   };
   
-  // Function to calculate GST-inclusive discount
   const calculateGSTInclusiveDiscount = () => {
     return calculateGSTInclusiveOriginalTotal() - calculateGSTInclusiveTotal();
   };
@@ -2444,44 +2438,39 @@ const CheckoutPage = ({ setCurrentPage }) => {
     zipCode: ''
   });
   
+  // Updated otherServices with fixed values
+  const [otherServices, setOtherServices] = useState({
+    brandOwnerUsername: '',
+    brandOwnerPassword: '',
+    orderType: 'instore', // Fixed value
+    fulfillmentBy: 'brandOwner' // Fixed value
+  });
+  
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const companyDropdownRef = useRef(null);
+  const [userCredits] = useState(50);
   
-  // User's available credits (mock data - in a real app, this would come from user context or API)
-  const [userCredits] = useState(50); // Example: 50 credits = ₹5000
+  // New states for tabs and QR/payment
+  const [activeTab, setActiveTab] = useState('delivery');
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   
-  // Calculate total credits needed for order
   const calculateTotalCredits = () => {
-    return Math.ceil(calculateGSTInclusiveTotal() / 100); // 1 Credit = ₹100
+    return Math.ceil(calculateGSTInclusiveTotal() / 100);
   };
   
-  // Check if user has enough credits to pay with credits
   const canPayWithCredits = userCredits >= calculateTotalCredits();
   
-  // Function to calculate GST rate based on product price and category
   const getGSTRate = (price, category) => {
-    // For clothing items
     if (category === 'Clothing') {
-      // Clothes up to ₹2,500 per piece → 5% GST
-      if (price <= 2500) {
-        return 0.05; // 5%
-      }
-      // Clothes above ₹2,500 per piece → 18% GST
-      else {
-        return 0.18; // 18%
-      }
-    }
-    // For accessories and other items
-    else {
-      // For accessories like watches and handbags, using 18% GST
-      // This can be adjusted based on specific GST rules for accessories
-      return 0.18; // 18%
+      return price <= 2500 ? 0.05 : 0.18;
+    } else {
+      return 0.18;
     }
   };
   
-  // Calculate GST breakdown by rate
   const calculateGSTBreakdown = () => {
     const gst5 = cartItems.reduce(
       (total, item) => {
@@ -2512,25 +2501,62 @@ const CheckoutPage = ({ setCurrentPage }) => {
     }));
   };
   
+  const handleOtherServicesChange = (e) => {
+    const { name, value } = e.target;
+    setOtherServices(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
   const handlePaymentMethodChange = (method) => {
     setPaymentMethod(method);
   };
   
-  const handleCompletePurchase = () => {
-    // Validate form
-    if (!deliveryDetails.firstName || !deliveryDetails.lastName || 
-        !deliveryDetails.email || !deliveryDetails.phone || 
-        !deliveryDetails.address || !deliveryDetails.city || 
-        !deliveryDetails.state || !deliveryDetails.zipCode) {
-      alert('Please fill in all delivery details');
+  const handlePayWithServices = () => {
+    // Validate other services fields
+    if (!otherServices.brandOwnerUsername || !otherServices.brandOwnerPassword) {
+      alert('Please fill in all brand owner details');
       return;
     }
+    
+    // Show QR code
+    setShowQRCode(true);
+  };
+  
+  const handleScanComplete = () => {
+    // Hide QR code and show success popup
+    setShowQRCode(false);
+    setShowSuccessPopup(true);
     
     // Place order
     const newOrder = placeOrder(deliveryDetails, paymentMethod);
     
-    // Redirect to order summary
-    setCurrentPage('orderSummary');
+    // Hide success popup after 3 seconds and redirect
+    setTimeout(() => {
+      setShowSuccessPopup(false);
+      setCurrentPage('orderSummary');
+    }, 3000);
+  };
+  
+  const handleCompletePurchase = () => {
+    if (activeTab === 'delivery') {
+      // Validate delivery details
+      if (!deliveryDetails.firstName || !deliveryDetails.lastName || 
+          !deliveryDetails.email || !deliveryDetails.phone || 
+          !deliveryDetails.address || !deliveryDetails.city || 
+          !deliveryDetails.state || !deliveryDetails.zipCode) {
+        alert('Please fill in all delivery details');
+        return;
+      }
+      
+      // Place order
+      const newOrder = placeOrder(deliveryDetails, paymentMethod);
+      setCurrentPage('orderSummary');
+    } else {
+      // Handle other services payment
+      handlePayWithServices();
+    }
   };
   
   return (
@@ -2543,7 +2569,6 @@ const CheckoutPage = ({ setCurrentPage }) => {
         }
       `}</style>
       
-      {/* Main Header - unchanged but without menu and cart icons */}
       <Header 
         setCurrentPage={setCurrentPage} 
         setShowAuth={() => {}} 
@@ -2556,7 +2581,6 @@ const CheckoutPage = ({ setCurrentPage }) => {
         showCartIcon={false}
       />
       
-      {/* New Dedicated Checkout Secondary Header */}
       <div className="bg-gray-50 border-b border-gray-200">
         <div className="max-w-8xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
@@ -2573,333 +2597,545 @@ const CheckoutPage = ({ setCurrentPage }) => {
       </div>
       
       <div className="max-w-8xl mx-auto px-4 py-8">
-  <div className="grid md:grid-cols-3 gap-8">
-    {/* Cart Summary */}
-    <div className="md:col-span-2">
-      <div className="bg-gray-50 rounded-lg p-6 mb-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Cart Summary</h2>
-        
-        <div className="space-y-4 mb-6">
-          {cartItems.map((item) => {
-            const inclusivePrice = calculateGSTInclusivePrice(item.price, item.category);
-            // Updated credit calculation: price divided by 10 instead of 100
-            const itemCredits = (inclusivePrice / 10).toFixed(2);
-            
-            return (
-              <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="flex gap-4 pb-4 border-b">
-                <img 
-                  src={item.images[0]} 
-                  alt={item.name} 
-                  className="w-16 h-20 object-cover rounded"
-                />
-                <div className="flex-1">
-                  <h3 className="font-semibold">{item.name}</h3>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                   <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
-                   Size: {item.selectedSize}
-                   </span>
-                   <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
-                      Color: {item.selectedColor}
-                      </span>
-                       <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
-                      Qty: {item.quantity}
-                    </span>
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Cart Summary */}
+          <div className="md:col-span-2">
+            <div className="bg-gray-50 rounded-lg p-6 mb-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Cart Summary</h2>
+              
+              <div className="space-y-4 mb-6">
+                {cartItems.map((item) => {
+                  const inclusivePrice = calculateGSTInclusivePrice(item.price, item.category);
+                  const itemCredits = (inclusivePrice / 10).toFixed(2);
+                  
+                  return (
+                    <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="flex gap-4 pb-4 border-b">
+                      <img 
+                        src={item.images[0]} 
+                        alt={item.name} 
+                        className="w-16 h-20 object-cover rounded"
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-semibold">{item.name}</h3>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
+                            Size: {item.selectedSize}
+                          </span>
+                          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
+                            Color: {item.selectedColor}
+                          </span>
+                          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-800 mt-2">
+                            Qty: {item.quantity}
+                          </span>
+                        </div>
+                        <div className="flex items-center mb-4">
+                          <span className="font-bold">₹{inclusivePrice * item.quantity}</span>
+                          <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
+                            {itemCredits * item.quantity} Credits
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  <div className="flex items-center mb-4">
-                    <span className="font-bold">₹{inclusivePrice * item.quantity}</span>
-                    <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white ml-1 shadow-lg">
-                     {itemCredits * item.quantity} Credits
-                    </span>
+                  );
+                })}
+              </div>
+              
+              <div className="space-y-2 mb-6">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total MRP (Inclusive of all taxes)</span>
+                  <span className="font-semibold">₹{calculateGSTInclusiveTotal()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Discount</span>
+                  <span className="font-semibold text-green-600">-₹{calculateGSTInclusiveDiscount()}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                  <div className="flex items-baseline">
+                    <span>Total</span>
+                  </div>
+                  <div className="flex items-baseline">
+                    <span>₹{calculateGSTInclusiveTotal()}</span>
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-        
-        <div className="space-y-2 mb-6">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Total MRP (Inclusive of all taxes)</span>
-            <span className="font-semibold">₹{calculateGSTInclusiveTotal()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Discount</span>
-            <span className="font-semibold text-green-600">-₹{calculateGSTInclusiveDiscount()}</span>
-          </div>
-          <div className="flex justify-between text-lg font-bold pt-2 border-t">
-            <div className="flex items-baseline">
-              <span>Total</span>
-              {/* Updated total credits calculation <span className="text-sm text-gray-500 ml-1">({(calculateGSTInclusiveTotal() / 10).toFixed(2)} Credits)</span> */}  
+              
+              <button 
+                onClick={handleCompletePurchase}
+                className="w-full mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+              >
+                {activeTab === 'delivery' ? 'Complete Purchase' : 'Pay Now'}
+              </button>
             </div>
-            <div className="flex items-baseline">
-              <span>₹{calculateGSTInclusiveTotal()}</span>
+            
+            {/* Delivery & Service Section with Tabs */}
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Delivery & Service</h2>
+              
+              {/* Tab Navigation */}
+              <div className="flex border-b border-gray-200 mb-6">
+                <button
+                  onClick={() => setActiveTab('delivery')}
+                  className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                    activeTab === 'delivery'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Delivery Details
+                </button>
+                <button
+                  onClick={() => setActiveTab('services')}
+                  className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                    activeTab === 'services'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Other Services
+                </button>
+              </div>
+              
+              {/* Tab Content */}
+              {activeTab === 'delivery' ? (
+                /* Delivery Details Tab */
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                      <input 
+                        type="text" 
+                        name="firstName"
+                        value={deliveryDetails.firstName}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                      <input 
+                        type="text" 
+                        name="lastName"
+                        value={deliveryDetails.lastName}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input 
+                      type="email" 
+                      name="email"
+                      value={deliveryDetails.email}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input 
+                      type="tel" 
+                      name="phone"
+                      value={deliveryDetails.phone}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <textarea 
+                      name="address"
+                      value={deliveryDetails.address}
+                      onChange={handleInputChange}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="grid md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                      <input 
+                        type="text" 
+                        name="city"
+                        value={deliveryDetails.city}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                      <input 
+                        type="text" 
+                        name="state"
+                        value={deliveryDetails.state}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Zip Code</label>
+                      <input 
+                        type="text" 
+                        name="zipCode"
+                        value={deliveryDetails.zipCode}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Other Services Tab with Fixed Options */
+                <div className="space-y-4">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Brand Owner Username</label>
+                    <input 
+                      type="text" 
+                      name="brandOwnerUsername"
+                      value={otherServices.brandOwnerUsername}
+                      onChange={handleOtherServicesChange}
+                      placeholder="Enter username"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Brand Owner Password</label>
+                    <input 
+                      type="password" 
+                      name="brandOwnerPassword"
+                      value={otherServices.brandOwnerPassword}
+                      onChange={handleOtherServicesChange}
+                      placeholder="Enter password"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Order Type</label>
+                    <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md">
+                      <span className="text-gray-700">Instore Pickup</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fulfillment By</label>
+                    <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md">
+                      <span className="text-gray-700">Brand Owner</span>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={handlePayWithServices}
+                    className="w-full py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+                  >
+                    Pay Now
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+          
+          {/* Payment Section */}
+<div className="md:col-span-1">
+  {activeTab === 'delivery' ? (
+    /* Payment Section - Only for Delivery Details */
+    <div className="bg-gray-50 rounded-lg p-6">
+      <h2 className="text-lg font-bold text-gray-800 mb-4">Payment Method</h2>
+      
+      <div className="space-y-3 mb-6">
+        <button 
+          onClick={() => handlePaymentMethodChange('card')}
+          className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'card' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+        >
+          <CreditCard size={20} />
+          <span className="font-medium">Card Payment</span>
+        </button>
         
         <button 
-          onClick={handleCompletePurchase}
-          className="w-full mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+          onClick={() => handlePaymentMethodChange('upi')}
+          className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'upi' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
         >
-          Complete Purchase
+          <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">U</div>
+          <span className="font-medium">UPI</span>
+        </button>
+        
+        <button 
+          onClick={() => handlePaymentMethodChange('wallet')}
+          className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'wallet' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+        >
+          <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold">W</div>
+          <span className="font-medium">Platform Wallet</span>
+        </button>
+        
+        <button 
+          onClick={() => handlePaymentMethodChange('credits')}
+          className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'credits' ? 'border-blue-500 bg-blue-50' : canPayWithCredits ? 'border-gray-300' : 'border-gray-200 opacity-50 cursor-not-allowed'}`}
+          disabled={!canPayWithCredits}
+        >
+          <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">C</div>
+          <div className="flex-1 text-left">
+            <span className="font-medium">Credits</span>
+            {!canPayWithCredits && (
+              <p className="text-xs text-red-500">Insufficient credits</p>
+            )}
+          </div>
         </button>
       </div>
       
-      {/* Delivery Details Form */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Delivery Details</h2>
-        
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
+      {paymentMethod === 'card' && (
+        <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
             <input 
               type="text" 
-              name="firstName"
-              value={deliveryDetails.firstName}
-              onChange={handleInputChange}
+              placeholder="1234 5678 9012 3456"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-            <input 
-              type="text" 
-              name="lastName"
-              value={deliveryDetails.lastName}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+              <input 
+                type="text" 
+                placeholder="MM/YY"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CVV</label>
+              <input 
+                type="text" 
+                placeholder="123"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
         </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input 
-            type="email" 
-            name="email"
-            value={deliveryDetails.email}
-            onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-          <input 
-            type="tel" 
-            name="phone"
-            value={deliveryDetails.phone}
-            onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-          <textarea 
-            name="address"
-            value={deliveryDetails.address}
-            onChange={handleInputChange}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <div className="grid md:grid-cols-3 gap-4 mb-4">
+      )}
+      
+      {paymentMethod === 'upi' && (
+        <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">UPI ID</label>
             <input 
               type="text" 
-              name="city"
-              value={deliveryDetails.city}
-              onChange={handleInputChange}
+              placeholder="yourname@upi"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <div className="flex gap-2">
+            <button className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors font-semibold">
+              Google Pay
+            </button>
+            <button className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors font-semibold">
+              PhonePe
+            </button>
+            <button className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors font-semibold">
+              Paytm
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {paymentMethod === 'wallet' && (
+        <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-            <input 
-              type="text" 
-              name="state"
-              value={deliveryDetails.state}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Wallet Type</label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option>Income Wallet</option>
+              <option>E-Wallet</option>
+            </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Zip Code</label>
-            <input 
-              type="text" 
-              name="zipCode"
-              value={deliveryDetails.zipCode}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Available Balance</label>
+            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-green-800 font-semibold">₹5,000</p>
+            </div>
           </div>
+        </div>
+      )}
+      
+      {paymentMethod === 'credits' && (
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Credits Information</label>
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-md">
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-700">Available Credits:</span>
+                <span className="font-semibold text-purple-800">{userCredits}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-700">Credits Required:</span>
+                <span className="font-semibold text-purple-800">{(calculateGSTInclusiveTotal() / 10).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Credits Remaining:</span>
+                <span className="font-semibold text-purple-800">{(userCredits - (calculateGSTInclusiveTotal() / 10)).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="flex gap-3">
+        <button 
+          onClick={() => setCurrentPage('cart')}
+          className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+        >
+          Continue Shopping
+        </button>
+        <button 
+          onClick={handleCompletePurchase}
+          className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+        >
+          Pay Now
+        </button>
+      </div>
+    </div>
+  ) : (
+    /* Payment Info for Other Services */
+    <div className="bg-gray-50 rounded-lg p-6">
+      <div className="text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <QrCode size={32} className="text-blue-600" />
+        </div>
+        <h2 className="text-lg font-bold text-gray-800 mb-2">QR Code Payment</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          For Other Services, payment is processed through QR code scanning
+        </p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-xs text-blue-700 font-medium">
+            Click "Pay Now" in the Other Services section to generate QR code
+          </p>
         </div>
       </div>
     </div>
-    
-    {/* Payment Section */}
-    <div>
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Payment Method</h2>
-        
-        <div className="space-y-3 mb-6">
-          <button 
-            onClick={() => handlePaymentMethodChange('card')}
-            className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'card' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
-          >
-            <CreditCard size={20} />
-            <span className="font-medium">Card Payment</span>
-          </button>
-          
-          <button 
-            onClick={() => handlePaymentMethodChange('upi')}
-            className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'upi' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
-          >
-            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">U</div>
-            <span className="font-medium">UPI</span>
-          </button>
-          
-          <button 
-            onClick={() => handlePaymentMethodChange('wallet')}
-            className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'wallet' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
-          >
-            <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold">W</div>
-            <span className="font-medium">Platform Wallet</span>
-          </button>
-          
-          <button 
-            onClick={() => handlePaymentMethodChange('credits')}
-            className={`w-full flex items-center gap-3 p-3 border rounded-md ${paymentMethod === 'credits' ? 'border-blue-500 bg-blue-50' : canPayWithCredits ? 'border-gray-300' : 'border-gray-200 opacity-50 cursor-not-allowed'}`}
-            disabled={!canPayWithCredits}
-          >
-            <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">C</div>
-            <div className="flex-1 text-left">
-              <span className="font-medium">Credits</span>
-              {!canPayWithCredits && (
-                <p className="text-xs text-red-500">Insufficient credits</p>
-              )}
+  )}
+</div>
+        </div>
+      </div>
+      
+      {/* QR Code Modal */}
+{showQRCode && (
+  <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl overflow-hidden">
+      {/* Modal Header */}
+      <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4">
+        <h3 className="text-lg font-bold text-white text-center">Scan to Pay</h3>
+      </div>
+      
+      {/* Modal Body */}
+      <div className="p-6">
+        {/* QR Code Container */}
+        <div className="flex justify-center mb-6">
+          <div className="relative">
+            <div className="w-56 h-56 bg-white border-2 border-gray-200 rounded-xl shadow-lg flex items-center justify-center p-4">
+              {/* QR Code Pattern */}
+              <div className="relative w-full h-full">
+                {/* QR Code Grid Pattern */}
+                <div className="absolute inset-0 grid grid-cols-7 gap-0.5">
+                  {[...Array(49)].map((_, i) => (
+                    <div 
+                      key={i} 
+                      className={`${Math.random() > 0.5 ? 'bg-slate-800' : 'bg-white'} rounded-sm`}
+                    />
+                  ))}
+                </div>
+                {/* Corner Markers */}
+                <div className="absolute top-0 left-0 w-6 h-6 border-2 border-slate-800 rounded-tl-lg"></div>
+                <div className="absolute top-0 right-0 w-6 h-6 border-2 border-slate-800 rounded-tr-lg"></div>
+                <div className="absolute bottom-0 left-0 w-6 h-6 border-2 border-slate-800 rounded-bl-lg"></div>
+                <div className="absolute bottom-0 right-0 w-6 h-6 border-2 border-slate-800 rounded-br-lg"></div>
+                {/* Center Logo Placeholder */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 bg-white rounded-full border-2 border-slate-800 flex items-center justify-center">
+                    <div className="w-6 h-6 bg-slate-800 rounded"></div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </button>
+            {/* Scanning Animation Effect */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="h-full w-full bg-gradient-to-b from-transparent via-blue-400 to-transparent opacity-20 animate-pulse"></div>
+            </div>
+          </div>
         </div>
         
-        {paymentMethod === 'card' && (
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
-              <input 
-                type="text" 
-                placeholder="1234 5678 9012 3456"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
-                <input 
-                  type="text" 
-                  placeholder="MM/YY"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CVV</label>
-                <input 
-                  type="text" 
-                  placeholder="123"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+        {/* Payment Details */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-600 font-medium">Merchant</span>
+            <span className="text-sm font-semibold text-gray-800">Your Store</span>
+          </div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-600 font-medium">Order ID</span>
+            <span className="text-sm font-semibold text-gray-800">ORD{Date.now().toString().slice(-6)}</span>
+          </div>
+          <div className="border-t border-gray-200 pt-2 mt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-base text-gray-700 font-bold">Total Amount</span>
+              <span className="text-xl font-bold text-slate-800">₹{calculateGSTInclusiveTotal()}</span>
             </div>
           </div>
-        )}
+        </div>
         
-        {paymentMethod === 'upi' && (
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">UPI ID</label>
-              <input 
-                type="text" 
-                placeholder="yourname@upi"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors font-semibold">
-                Google Pay
-              </button>
-              <button className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors font-semibold">
-                PhonePe
-              </button>
-              <button className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors font-semibold">
-                Paytm
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Instructions */}
+        <div className="text-center mb-6">
+          <p className="text-sm text-gray-600">
+            Scan this QR code using any UPI app
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Payment will be confirmed automatically
+          </p>
+        </div>
         
-        {paymentMethod === 'wallet' && (
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Wallet Type</label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>Income Wallet</option>
-                <option>E-Wallet</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Available Balance</label>
-              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                <p className="text-green-800 font-semibold">₹5,000</p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {paymentMethod === 'credits' && (
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Credits Information</label>
-              <div className="p-3 bg-purple-50 border border-purple-200 rounded-md">
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-700">Available Credits:</span>
-                  <span className="font-semibold text-purple-800">{userCredits}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-700">Credits Required:</span>
-                  {/* Updated credits calculation */}
-                  <span className="font-semibold text-purple-800">{(calculateGSTInclusiveTotal() / 10).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Credits Remaining:</span>
-                  {/* Updated credits calculation */}
-                  <span className="font-semibold text-purple-800">{(userCredits - (calculateGSTInclusiveTotal() / 10)).toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        
+        {/* Action Buttons */}
         <div className="flex gap-3">
           <button 
-            onClick={() => setCurrentPage('cart')}
-            className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+            onClick={() => setShowQRCode(false)}
+            className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 font-semibold text-sm"
           >
-            Continue Shopping
+            Cancel
           </button>
           <button 
-            onClick={handleCompletePurchase}
-            className="flex-1 mt-2 py-3 bg-slate-800 text-white text-sm font-bold rounded hover:bg-slate-700 transition-colors"
+            onClick={handleScanComplete}
+            className="flex-1 py-3 px-4 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg hover:from-slate-800 hover:to-slate-900 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg"
           >
-            Pay Now
+            I've Paid
           </button>
+        </div>
+      </div>
+      
+      {/* Modal Footer */}
+      <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <p className="text-xs text-gray-600">Waiting for payment...</p>
         </div>
       </div>
     </div>
   </div>
-</div>
+)}
+      
+      {/* Success Popup */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-sm p-6 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold mb-2">Product Purchased Successfully!</h3>
+            <p className="text-gray-600">Your order has been placed successfully.</p>
+          </div>
+        </div>
+      )}
       
       <Footer />
     </div>
